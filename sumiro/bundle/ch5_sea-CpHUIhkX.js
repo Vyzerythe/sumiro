@@ -1,0 +1,167 @@
+import{A as e,R as t,V as n,ht as r,k as i,nt as a,q as o}from"./index-DnHRwVtn.js";import{r as s,t as c}from"./collision-DtBQEpmQ.js";import{c as l,l as u,n as d,s as f,t as p}from"./kit-B01EgPBo.js";import{n as m,t as h}from"./body_room-V11x-0lP.js";import{c as g,n as _,o as ee,r as te,s as v}from"./ink_material-CrFtRYQr.js";var y={discs:[[114.83,-509.81,.72,3.2,5.64],[121.2,-486.4,.65,3.2,9.2],[128.8,-486.4,.65,3.2,9.2],[112.4,-507.4,.43,3.2,5.85],[113.98,-507.4,.69,3.2,5.85],[114.77,-507.4,.55,3.2,5.85],[115.56,-507.4,.55,3.2,5.85],[116.35,-507.4,.69,3.2,5.85],[117.14,-507.4,.55,3.2,5.85],[117.93,-507.4,.55,3.2,5.85],[118.72,-507.4,.69,3.2,5.85],[120.3,-507.4,.43,3.2,5.85],[129.7,-507.4,.43,3.2,5.85],[131.28,-507.4,.69,3.2,5.85],[132.07,-507.4,.55,3.2,5.85],[132.86,-507.4,.55,3.2,5.85],[133.65,-507.4,.69,3.2,5.85],[134.44,-507.4,.55,3.2,5.85],[135.23,-507.4,.55,3.2,5.85],[136.02,-507.4,.69,3.2,5.85],[137.6,-507.4,.43,3.2,5.85],[121.2,-507.4,.65,3.2,9.2],[128.8,-507.4,.65,3.2,9.2]],faces:[]},b={low:0,high:3,lowHold:8,rise:4,highHold:4,fall:4},x=3.6,S=.35,ne=e=>[...e,e[0]],C=(e,t,n,r)=>[[e,t],[n,t],[n,r],[e,r]];function w(e,t,n,r,i=3.2,a=32){let o=[];for(let s=0;s<a;s++){let c=s/a*Math.PI*2,l=Math.cos(c),u=Math.sin(c);o.push([e+n*Math.sign(l)*Math.abs(l)**(2/i),t+r*Math.sign(u)*Math.abs(u)**(2/i)])}return o}var T=[],E=[];function D(e,t,n,r,i,a=x,o={}){let s={id:e,kind:`rock`,poly:w(t,n,r,i,o.p),y:a,cx:t,cz:n,rx:r,rz:i,surface:`rock`};return T.push(s),s}function O(e,t,n,r,i){let a={id:e,kind:`stone`,poly:w(t,n,r,r,2,12),y:i,cx:t,cz:n,rx:r,rz:r,surface:`rock`};return T.push(a),a}function k(e,t,n){let r=t.length,i={id:e,kind:`flat`,poly:t,y:n,cx:t.reduce((e,t)=>e+t[0],0)/r,cz:t.reduce((e,t)=>e+t[1],0)/r,surface:`stone`};return T.push(i),i}function A(e,t,n,r,i,a){let o=n[0]-t[0],s=n[1]-t[1],c=Math.hypot(o,s),l=o/c,u=s/c,d=r/2,f=-u*d,p=l*d,m=[[t[0]-f,t[1]-p],[n[0]-f,n[1]-p],[n[0]+f,n[1]+p],[t[0]+f,t[1]+p]],h=(a-i)/c;T.push({id:e,kind:`stair`,poly:m,y:i,yb:a,a:t,b:n,width:r,tilt:[l*h,u*h],surface:`stair`}),E.push([t[0],t[1],d+.3],[n[0],n[1],d+.3])}var j=(e,t,n)=>E.push([e,t,n]);D(`shore`,30,-72,17,13),A(`st_shore`,[30,-85],[30,-92],8,x,1),k(`flat1`,[[24,-92],[36,-92],[40,-102],[40,-112],[28,-112],[24,-102]],1),A(`st_flat1`,[34,-112],[34,-119],8,1,x),D(`r1`,34,-129,12,10);var M=2.2;O(`s1`,32.6,-142.6,M,2.5),O(`s2`,33.8,-148,M,2.8),O(`s3`,33,-153.2,M,3.1),D(`stack`,33.6,-160,3.6,3.6),O(`s4`,35.6,-166,M,2.3),O(`s5`,34.6,-170.6,M,1.7),O(`s6`,35.8,-175.2,M,1.3),O(`s7`,34.6,-179.8,M,1.7),O(`s8`,35.4,-184.4,M,2.6),D(`r2`,34,-197,14,10),D(`scroll_rock`,13,-160,5,5),A(`st_scroll`,[13,-165],[13,-171],6,x,.45),k(`corridor`,[[10,-171],[16,-171],[16,-183],[14,-187],[8,-187],[8,-182],[10,-178]],.45);var N=6.2;D(`r3`,34,-229,15,12,N),A(`st_r3`,[34,-241],[34,-251],8,N,x),D(`dock4`,34,-256,7,5),D(`m4`,34,-304,10,10),D(`hidden`,-12,-304,6,6),O(`p1`,58.5,-304,2.8,x),O(`p2`,58.5,-324,2.8,x),D(`i5`,86,-324,11,9);var P=1.1;A(`st_i5`,[86,-333],[86,-340],10,x,P),k(`flat6`,C(81,-372,91,-340),P),A(`st_flat6`,[86,-372],[86,-379],10,P,x);var F=[-348,-359,-370];D(`i6`,86,-389,12,10);var I=5.4;O(`a1`,101.5,-389,M,2.6),O(`a2`,106.6,-388.4,M,2.2),D(`r7a`,114,-389,3.5,3),O(`a3`,120.5,-390,M,2.2),O(`a4`,125.6,-389.4,M,1.6),O(`a5`,130.7,-390,M,2.2),D(`r7b`,139,-391,4.5,4.5),D(`archers`,125,-403,22,4,I),A(`st_archers`,[139,-395.5],[139,-399.6],5,x,I);var L=2.4;A(`st_cw_in`,[125,-407],[125,-412.5],5,I,L),k(`causeway`,[[123,-412.5],[127,-412.5],[127,-424],[132,-424],[132,-430],[127,-430],[127,-458],[123,-458],[123,-448],[118,-448],[118,-442],[123,-442]],L),A(`st_cw_out`,[125,-458],[125,-464],5,L,x),D(`i9`,125,-472,10,8),k(`court_bridge`,C(122.5,-486.2,127.5,-479.8),x),j(125,-480,3),j(125,-486,3),j(125,-512,3),D(`court`,125,-499,13,13);var R=5.6;D(`i10`,125,-530,8,9,R),A(`st_i10`,[133,-530],[139,-530],6,R,x),D(`dock10`,143.5,-530,4.5,5),D(`gw`,191.5,-530,8.5,7);var z=.35;A(`st_gate_in`,[191.5,-537],[191.5,-548],8,x,z),k(`gate_way`,C(186.5,-566,196.5,-548),z),A(`st_gate_out`,[191.5,-566],[191.5,-577],8,z,x),D(`end`,191.5,-590,11,13);var B=-557,V=e=>T.find(t=>t.id===e);function re(e){let t=ne(e),n=[],r=[],i=(e,t)=>E.some(([n,r,i])=>Math.hypot(e-n,t-r)<i);for(let e=0;e+1<t.length;e++){let[a,o]=t[e],[s,c]=t[e+1],l=Math.max(1,Math.ceil(Math.hypot(s-a,c-o)/.6));for(let e=0;e<=l;e++){let t=a+(s-a)*e/l,u=o+(c-o)*e/l;i(t,u)?(r.length>1&&n.push(r),r=[]):(e>0||!r.length)&&r.push([t,u])}}return r.length>1&&n.push(r),n}function ie(){let e=[];for(let t of T)if(t.kind===`stair`){let n=Math.max(t.y,t.yb)+4,r=Math.min(t.y,t.yb)-1;e.push({id:`${t.id}_l`,kind:`guard`,pts:[t.poly[0],t.poly[1]],from:r,to:n}),e.push({id:`${t.id}_r`,kind:`guard`,pts:[t.poly[3],t.poly[2]],from:r,to:n})}else re(t.poly).forEach((n,r)=>e.push({id:`${t.id}_rim${r}`,kind:`guard`,pts:n,from:t.y-1,to:t.y+4}));return e}function ae(e,t,n,r={}){let i=V(t),a=i.poly.length,o=i.poly.map(([e,t])=>n(e,t)),s=o.findIndex((e,t)=>e&&!o[(t+a-1)%a]);s<0&&(s=0);let c=[];for(let e=0;e<a;e++){let t=(s+e)%a;if(!o[t]){if(c.length)break;continue}let[n,r]=i.poly[t],[l,u]=i.poly[(t+a-1)%a],[d,f]=i.poly[(t+1)%a],p=f-u,m=-(d-l),h=Math.hypot(p,m)||1;p/=h,m/=h,p*(n-i.cx)+m*(r-i.cz)<0&&(p=-p,m=-m),c.push([n,i.y,r,p,m])}return r.closed&&c.push(c[0]),{id:e,climbable:!0,points:c}}var H=(e,t,n,r)=>(i,a)=>i>=e&&i<=n&&a>=t&&a<=r,U=()=>!0,oe=1.7,se=2.1;function ce(e,t,n,r){let i=1/0;for(let a of T){if(a===e||a.y<n-se)continue;let o=a.poly.length;for(let e=0;e<o;e++){let[n,s]=a.poly[e],[c,l]=a.poly[(e+1)%o],u=c-n,d=l-s,f=Math.min(Math.max(((t-n)*u+(r-s)*d)/(u*u+d*d||1),0),1);i=Math.min(i,Math.hypot(n+u*f-t,s+d*f-r))}}return i}function le(e,t){let n=V(t),r=e.points,i=r.map(([e,t,r])=>ce(n,e,t,r)>=oe);if(i.every(Boolean))return[e];let a=[],o=[];return r.forEach((e,t)=>{i[t]?o.push(e):(o.length&&a.push(o),o=[])}),o.length&&a.push(o),r[0]===r[r.length-1]&&a.length>1&&i[0]&&i[r.length-1]&&(a[0]=[...a.pop(),...a[0].slice(1)]),a.filter(e=>e.length>1).map((t,n)=>({...e,id:n?`${e.id}_${n}`:e.id,points:t}))}var W=(e,t,n,r)=>le(ae(e,t,n,r),t),G={mode:`ping`,time:7,pause:3,phase:14/20,float:`sea`,size:[3.6,6.5],thick:.5,surface:`wood`},K={mode:`ping`,time:2.6,pause:2.4,float:`sea`,size:[4,4],thick:.6,surface:`stone`},q={id:`ch5_sea`,sightMeshes:`^(arches|pads_side|pads_top|pads_wet|shoulders|rim_boulders|monoliths|stairs|court_wall|road_rock|road_steps)`,sightFiles:[`levels/ch5_sea/sea.glb`],title:`Sea of Ink`,next:`ch6_summit`,spawn:{x:30,z:-64,heading:0},killY:-4,palette:{vista:-30,sky:[.95,.97,1.05],wash:[.9,.99,1.02],redAmount:.3,mist:[1.02,1.04,1.07]},sun:{dir:[.35,.8,.45],mul:[.5,.5,.53],fill:.7},surfaces:T.map(e=>({id:e.id,poly:e.poly,y:e.y,surface:e.surface,tilt:e.tilt})),edges:[...ie(),{id:`screen`,kind:`wall`,pts:[[110,-392.2],[118,-392.2]],from:1,to:8},{id:`bell_l`,kind:`wall`,round:!0,pts:[[120.6,-405.8],[120.8,-406],[121,-405.8],[120.8,-405.6],[120.6,-405.8]],from:4.4,to:8.8},{id:`bell_r`,kind:`wall`,round:!0,pts:[[123,-405.8],[123.2,-406],[123.4,-405.8],[123.2,-405.6],[123,-405.8]],from:4.4,to:8.8},...re(V(`court`).poly).map((e,t)=>({id:`court_wall${t}`,kind:`wall`,pts:e,from:2.6,to:5.800000000000001})),{id:`court_in`,kind:`wall`,pts:[[121.5,-486.4],[128.5,-486.4]],from:2.6,to:7.6,group:`court_in`},{id:`court_out`,kind:`wall`,pts:[[121.5,-507.4],[128.5,-507.4]],from:2.6,to:7.6,group:`court_out`},{id:`court_cross_w`,kind:`wall`,pts:[[112,-507],[120.65,-507],[120.65,-506.85],[121.75,-506.85],[121.75,-507.95],[120.65,-507.95],[120.65,-507.8],[112,-507.8]],from:2.6,to:5.85},{id:`court_cross_e`,kind:`wall`,pts:[[138,-507],[129.35,-507],[129.35,-506.85],[128.25,-506.85],[128.25,-507.95],[129.35,-507.95],[129.35,-507.8],[138,-507.8]],from:2.6,to:5.85}],stones:[],ledges:[...W(`l_r2_s`,`r2`,H(20,-190,48,-180)),...W(`l_scroll_s`,`scroll_rock`,H(5,-170,22,-158)),...W(`l_r3_s`,`r3`,H(19,-222,49,-210)),...W(`l_dock4_n`,`dock4`,H(26,-263,42,-258)),...W(`l_m4_s`,`m4`,H(24,-297,44,-290)),...W(`l_m4_w`,`m4`,H(20,-312,26,-296)),...W(`l_m4_e`,`m4`,H(42,-312,48,-296)),...W(`l_hidden_e`,`hidden`,H(-8,-312,0,-296)),...T.filter(e=>e.kind===`stone`&&e.y>=2.2&&e.id!==`p1`&&e.id!==`p2`).flatMap(e=>W(`l_${e.id}`,e.id,U,{closed:!0})),...W(`l_stack`,`stack`,U,{closed:!0}),...W(`l_p1`,`p1`,U,{closed:!0}),...W(`l_p2`,`p2`,U,{closed:!0}),...W(`l_i5_w`,`i5`,H(70,-332,77.5,-316)),...W(`l_r7b`,`r7b`,H(133,-396,145,-386)),...W(`l_dock10_e`,`dock10`,H(146,-536,152,-524)),...W(`l_gw_w`,`gw`,H(180,-538,186,-522)),...W(`l_i10_s`,`i10`,H(115,-524,135,-518))],leapLinks:[{id:`to_scroll`,from:{poly:C(30,-163,32,-157),yMin:2.6},to:{land:[17.2,-159.5],spread:2.4},minSpeed:4.2,maxAngle:50,time:.9,clip:`leap_generic`,prompt:`Space  leap`},{id:`from_scroll`,from:{poly:C(16,-164,18.2,-156),yMin:2.6},to:{land:[33,-160],spread:1.4},minSpeed:4.2,maxAngle:50,time:.9,clip:`leap_generic`},{id:`court_over`,from:{poly:C(118,-512.3,132,-508.5),yMin:2.6,yMax:4.6},to:{ledge:`l_i10_s`,sFrom:2,sTo:13},minSpeed:4.2,maxAngle:50,time:.85,nominal:8,clip:`wall_leap`,prompt:`Space  leap to the far rock`,camera:{zone:`gap`}},{id:`court_back`,from:{poly:C(118,-523,132,-520.6),yMin:4.6},to:{land:[125,-509.5],spread:3.5},minSpeed:4.2,maxAngle:55,time:.95,clip:`leap_generic`,camera:{zone:`court`}},{id:`court_wall_back`,fromLedge:`l_i10_s`,to:{land:[125,-509.5],spread:3.5},time:.9,clip:`leap_generic`,camera:{zone:`court`}}],cameraZones:[{id:`on_raft`,kind:`fixed`,ride:`raft`,blend:5,yaw:-14,pitch:-47,distance:7.5,height:9.5},{id:`on_boat1`,kind:`fixed`,ride:`boat1`,blend:5,yaw:8,pitch:-47,distance:8,height:10},{id:`on_grey`,kind:`fixed`,ride:`grey`,blend:5,yaw:82,pitch:-47,distance:8,height:10},{id:`on_barge`,kind:`fixed`,ride:`barge`,blend:5,yaw:-80,pitch:-47,distance:8.5,height:10.5},{id:`raft`,kind:`fixed`,air:!0,blend:5,poly:C(14,-217.4,54,-207),yMax:5.2,yaw:-14,pitch:-47,distance:7.5,height:9.5},{id:`corridor`,kind:`fixed`,poly:C(2,-196,22,-166),yaw:14,pitch:-13,distance:9.2,height:4},{id:`scroll_top`,kind:`fixed`,poly:C(4,-168,22,-150),yaw:32,pitch:-12,distance:9,height:3.6},{id:`shore`,kind:`fixed`,poly:C(8,-90,56,-50),yaw:6,pitch:-9,distance:8.4,height:3},{id:`flat1`,kind:`fixed`,poly:C(14,-119,56,-90),yaw:5,pitch:-11,distance:9,height:3.4},{id:`r1`,kind:`fixed`,poly:C(14,-139,56,-119),yaw:-6,pitch:-13,distance:9.5,height:4},{id:`stones1`,kind:`fixed`,poly:C(22,-162,50,-139),yaw:3,pitch:-18,distance:11,height:5.2},{id:`stones2`,kind:`fixed`,poly:C(22,-187,50,-162),yaw:-2,pitch:-18,distance:11,height:5.2},{id:`r2`,kind:`fixed`,poly:C(14,-207,54,-187),yaw:4,pitch:-10,distance:9,height:3.4},{id:`r3`,kind:`fixed`,poly:C(14,-241,54,-207),yMin:5.2,yaw:10,pitch:-11,distance:9,height:3.6},{id:`dock4`,kind:`fixed`,poly:C(20,-262,50,-241),yaw:8,pitch:-10,distance:9,height:3.4},{id:`boat1`,kind:`fixed`,air:!0,blend:5,poly:C(20,-294,50,-262),yaw:8,pitch:-47,distance:8,height:10},{id:`grey`,kind:`fixed`,poly:C(-24,-316,24,-292),yaw:82,pitch:-9,distance:11,height:3.6},{id:`m4`,kind:`fixed`,poly:C(24,-314,45,-294),yaw:-44,pitch:-11,distance:9.6,height:3.8},{id:`ferries`,kind:`fixed`,poly:C(45,-334,75,-296),yaw:-74,pitch:-15,distance:12,height:5},{id:`i5`,kind:`fixed`,poly:C(75,-333,100,-312),yaw:-12,pitch:-11,distance:9.6,height:3.8},{id:`veils`,kind:`fixed`,poly:C(74,-379,98,-333),yaw:6,pitch:-7,distance:8.8,height:2.6},{id:`i6`,kind:`fixed`,poly:C(70,-402,98,-379),yaw:-42,pitch:-11,distance:9.6,height:3.8},{id:`across_fight`,kind:`track`,fight:`across`,poly:C(102,-408,148,-384),line:[[141,-389,-30,-28,21,11.5],[139,-395.5,-30,-28,21,11.5],[139,-401,25,-24,16,8],[118,-403,35,-22,14,7],[104,-403,40,-22,14,7]]},{id:`row`,kind:`fixed`,poly:C(98,-399.2,148,-380),yMax:5.2,yaw:-85,pitch:-13,distance:11.5,height:4.6},{id:`archers`,kind:`fixed`,poly:C(98,-408,148,-398),yaw:80,pitch:-15,distance:9.4,height:4},{id:`causeway`,kind:`fixed`,poly:C(110,-464,140,-408),yaw:4,pitch:-13,distance:10.4,height:4.4},{id:`i9`,kind:`fixed`,poly:C(110,-486,140,-464),yaw:3,pitch:-10,distance:9,height:3.4},{id:`court`,kind:`fixed`,poly:C(108,-512,142,-486),yaw:0,pitch:-29,distance:9.5,height:6.8},{id:`gap`,kind:`fixed`,poly:C(108,-539,133,-512),yaw:4,pitch:-9,distance:9.4,height:3.2},{id:`barge`,kind:`fixed`,poly:C(133,-546,183,-514),yaw:-80,pitch:-10,distance:12,height:4.2},{id:`gw`,kind:`fixed`,poly:C(183,-538,210,-520),yaw:-8,pitch:-10,distance:9.4,height:3.6},{id:`gate`,kind:`fixed`,poly:C(180,-577,204,-538),yaw:3,pitch:-4,distance:9.4,height:2.1},{id:`end`,kind:`fixed`,yaw:3,pitch:-7,distance:9,height:2.8}],shrines:[{id:`first_rock`,x:26.5,z:-131,heading:.9,stand:{x:27.4,z:-130.1,heading:0}},{id:`raft_top`,x:26,z:-231,heading:.6,stand:{x:26.9,z:-230.1,heading:0}},{id:`after_veils`,x:80,z:-392,heading:.6,stand:{x:80.9,z:-391.1,heading:-1.5}},{id:`before_court`,x:118.5,z:-474,heading:.6,stand:{x:119.4,z:-473.1,heading:0}},{id:`before_gate`,x:186,z:-533.5,heading:.6,stand:{x:186.9,z:-532.6,heading:0}}],entities:[{kind:`scroll`,id:`black_tide`,x:10,z:-185.6,heading:.4},{kind:`scroll`,id:`grey_boat`,x:-15,z:-306,heading:-.8}],triggers:[{id:`shore_lip`,poly:C(22,-85,38,-79),hint:`The black tide takes what it touches. Cross at low water.`},{id:`flat_retry`,poly:C(24,-112,40,-92),retry:`Wait on the dry rock. When the sea draws down, go.`},{id:`stones_hint`,poly:C(24,-140,44,-136),hint:`Stained rock goes under. Dry rock does not.`},{id:`raft_hint`,poly:C(20,-207.5,48,-203),hint:`The raft floats. Ride the water up, and at high water, Space to the ledge.`},{id:`veil_hint`,poly:C(81,-344,91,-340),hint:`Shift  Ink Step passes through a veil.`,teaches:`veil_step`},{id:`archer_hint`,poly:C(98,-392,104,-385),hint:`Right mouse  an arrow parried flies back.`},{id:`bell_hint`,poly:C(112,-407,132,-401),hint:`Left mouse or E  ring the bell. The crows break for a while.`},{id:`road_on`,poly:C(182,-604,201,-597)}],mechs:[{kind:`tide`,id:`sea`,...b,center:[100,-320],size:[3600,3600],node:`sea`},{kind:`platform`,id:`raft`,mode:`ping`,time:5,pause:.5,float:`sea`,path:[[32.5,.4,-212],[35.5,.4,-212]],size:[4.2,6],thick:.5,surface:`wood`,node:`raft_node`},{kind:`platform`,id:`boat1`,...G,path:[[34,S,-265.2],[34,S,-290.7]],node:`boat1_node`},{kind:`platform`,id:`grey`,...G,yaw:90,path:[[19.5,S,-304],[-2.7,S,-304]],node:`grey_node`},{kind:`platform`,id:`slab_a`,...K,path:[[46,.5,-304],[53.7,.5,-304]],node:`slab_a_node`},{kind:`platform`,id:`slab_b`,...K,phase:.71,path:[[58.5,.5,-308.8],[58.5,.5,-319.2]],node:`slab_b_node`},{kind:`platform`,id:`slab_c`,...K,phase:.75,path:[[63.3,.5,-324],[73,.5,-324]],node:`slab_c_node`},...F.map((e,t)=>({kind:`veil`,id:`veil${t}`,pts:[[79.5,e],[92.5,e]],from:-2,to:10,node:`veil${t}_node`})),{kind:`veil`,id:`gate_veil`,pts:[[184.5,B],[198.5,B]],from:-2,to:11,node:`gate_veil_node`},{kind:`bell`,id:`crow_bell`,x:122,y:7.4,z:-405.8,r:.8,interact:!0,prompt:`E  ring the bell`},{kind:`platform`,id:`barge`,...G,yaw:90,size:[4.5,9],path:[[153.5,S,-530],[178.45,S,-530]],node:`barge_node`}],combat:{sword:!0,catPressure:.85,tempo:{windup:.95,cooldown:.9},encounters:[{id:`raft_top`,start:{poly:C(22,-229,46,-219.5),yMin:5.2},waves:[[{kind:`wraith`,x:30,z:-233,y:N,heading:2.8},{kind:`wraith`,x:39,z:-231,y:N,heading:3.4}]],leash:{poly:C(21,-240,47,-218.5)},catHide:[[23.5,-220.5],[44.5,-220.5]],flag:`ch5_raft_top`},{id:`last_rock`,start:{poly:C(182,-586,201,-578)},waves:[[{kind:`wraith`,x:186,z:-592,heading:2.6},{kind:`wraith`,x:197,z:-592,heading:-2.6}],[{kind:`wraith`,x:185,z:-596,heading:2.6},{kind:`wraith`,x:198,z:-596,heading:-2.6},{kind:`archer`,x:191.5,z:-600.5,heading:3.14}]],leash:{poly:C(181,-602,202,-578)},catHide:[[184,-580.5],[199,-580.5]],flag:`ch5_last_rock`},{id:`i5_archers`,start:{poly:C(66,-332,75,-316)},waves:[[{kind:`archer`,x:79,z:-326,y:x,heading:-1.5}]],leash:{circle:[82,-325,9]},catHide:[[78.4,-318.8],[82.5,-317.4]],flag:`ch5_i5_archer`},{id:`across`,start:{poly:C(135.5,-394.5,143,-387.5)},waves:[[{kind:`archer`,x:131,z:-402.6,y:I,heading:3.14},{kind:`archer`,x:145,z:-402.6,y:I,heading:3.14}]],leash:{poly:[[104,-406.5],[146,-406.5],[146,-386],[134,-386],[134,-396.2],[144,-396.2],[144,-399.4],[104,-399.4]]},catHide:[[135.8,-388.4],[141.5,-388]],flag:`ch5_across`},{id:`far_archer`,start:{poly:C(166,-540,183,-520)},waves:[[{kind:`archer`,x:195,z:-533,y:x,heading:1.57}]],leash:{circle:[193,-531,7]},catHide:[[187.5,-527]],flag:`ch5_far_archer`},{id:`court`,start:{circle:[125,-499,7]},doors:[{group:`court_in`,node:`court_door_in`,lift:-4.9,startsOpen:!0},{group:`court_out`,node:`court_door_out`,lift:-4.9}],waves:[[{kind:`wraith`,x:118,z:-504,heading:2.4},{kind:`wraith`,x:132,z:-504,heading:-2.4}],[{kind:`archer`,x:125,z:-505.8,heading:3.14},{kind:`wraith`,x:114.5,z:-500.5,heading:2.4},{kind:`wraith`,x:135.5,z:-500.5,heading:-2.4}],[{kind:`wraith`,x:118.5,z:-505,heading:2.4},{kind:`wraith`,x:131.5,z:-505,heading:-2.4},{kind:`archer`,x:125,z:-505.8,heading:3.14}]],leash:{circle:[125,-499,13]},catHide:[[118,-489],[132,-489]],flag:`ch5_court`}],swarms:[{id:`causeway_crows`,line:[[125,3.6,-414],[125,3.6,-456]],speed:6,radius:1.3,pause:1.2,reform:9,count:40},{id:`barge_crows`,line:[[172,4.7,-519],[172,4.7,-541]],speed:4.5,radius:1.3,pause:1.4,reform:10,count:30}]}},J={uTideHigh:{value:3},uTideNow:{value:0}},ue=`
+{
+  // Height against the water is the world's. The marks lie on the surface: on a boat (space 'object') they ride with it.
+  vec3 tp = vInkWorldPos;
+  vec3 tq = inkP;
+  float tSteep = 1.0 - smoothstep(0.5, 0.85, inkNP.y);
+  float tWob = (vnoise(vec3(tq.xz * 0.31, 7.0)) - 0.5) * 0.46 + (vnoise(vec3(tq.xz * 1.3, 2.0)) - 0.5) * 0.14;
+  float tRef = uTideFollow > 0.5 ? uTideNow + 0.42 : uTideHigh;
+  float tH = tp.y - tRef - tWob * tSteep;
+  // Below the line it has been wet: a shade down, more toward the bottom. Bare stone reads as stone, wet as wet.
+  float tWet = smoothstep(0.1, -0.2, tH);
+  float tDeep = smoothstep(0.0, -2.6, tH);
+  float tStain = fbm3(vec3(tq.x * 0.5, tq.y * 1.6, tq.z * 0.5) + 4.0);
+  gl_FragColor.rgb *= mix(1.0, mix(0.74, 0.5, tDeep) * mix(0.82, 1.08, tStain), tWet);
+  // Paler bands the sea stopped at on the way, as in the concept: on faces only, thin, and broken.
+  float tBand = 0.0;
+  for (int i = 1; i <= 2; i++) {
+    float lv = tRef - float(i) * 0.95 + (vnoise(vec3(tq.xz * 0.5, float(i) * 9.0)) - 0.5) * 0.4;
+    tBand = max(tBand, smoothstep(0.1, 0.03, abs(tp.y - lv)) * smoothstep(0.32, 0.5, vnoise(vec3(tq.xz * 0.7, float(i) * 5.0))));
+  }
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.1, 0.1, 0.098), tBand * 0.6 * tSteep);
+  // The line: a heavy brushed black, thick and thin, with drips running from it.
+  float tThick = mix(0.1, 0.3, vnoise(vec3(tq.xz * 0.8, 3.0)));
+  float tLine = smoothstep(tThick, tThick - 0.06, abs(tH + 0.06));
+  float tCol = vnoise(vec3(tq.xz * 2.7, 11.0));
+  float tSeed = vnoise(vec3(tq.xz * 0.9, 17.0));
+  float tLen = 0.2 + 2.3 * tSeed * tSeed + 0.5 * vnoise(vec3(tq.xz * 5.1, 23.0));
+  float tDrip = smoothstep(0.04, -0.06, tH) * smoothstep(-tLen, -tLen + 0.3, tH);
+  // A drip thins toward its tip, by raising its gate.
+  tDrip *= smoothstep(0.62, 0.66 + 0.1 * clamp(-tH / max(tLen, 0.1), 0.0, 1.0), tCol);
+  float tInk = max(tLine, tDrip) * tSteep;
+  // On ground under the line: pools the sea left, not a band.
+  float tPool = smoothstep(0.54, 0.6, fbm3(vec3(tq.xz * 0.42, 31.0))) * (1.0 - tSteep) * tWet;
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.075, 0.073, 0.07), max(tInk, tPool * 0.85 * uTidePools));
+  // On any top: broad slabs a shade apart, and a few long cracks in a heavy line that thins out, as in the shore painting.
+  vec2 cq = tq.xz + 1.5 * vec2(vnoise(vec3(tq.xz * 0.3, 41.0)), vnoise(vec3(tq.xz * 0.3, 43.0))) + 0.35 * vec2(vnoise(vec3(tq.xz * 1.4, 44.0)), vnoise(vec3(tq.xz * 1.4, 45.0)));
+  float slab = vnoise(vec3(cq * 0.09, 61.0));
+  gl_FragColor.rgb *= mix(1.0, mix(0.9, 1.05, smoothstep(0.42, 0.58, slab)), 1.0 - tSteep);
+  // Noise stretched across a diagonal, so its contours run long instead of closing into rings. Two sets, one rarer.
+  float cw = mix(0.0012, 0.0075, smoothstep(0.4, 0.85, vnoise(vec3(tq.xz * 0.33, 53.0))));
+  float c1 = vnoise(vec3(cq.x * 0.05 + cq.y * 0.2, cq.x * 0.2 - cq.y * 0.05, 47.0));
+  float c2 = vnoise(vec3(cq.x * 0.17 - cq.y * 0.06, cq.x * 0.06 + cq.y * 0.17, 49.0));
+  float crack = smoothstep(cw, cw * 0.35, abs(c1 - 0.5)) * smoothstep(0.42, 0.56, vnoise(vec3(tq.xz * 0.055, 59.0)));
+  crack = max(crack, smoothstep(cw, cw * 0.35, abs(c2 - 0.5)) * smoothstep(0.56, 0.68, vnoise(vec3(tq.xz * 0.075, 37.0))));
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.085, 0.082, 0.078), crack * 0.9 * (1.0 - tSteep));
+}
+`;function de(e,{follow:t=!1,pools:n=!0}={}){let r=e.onBeforeCompile,i=e.customProgramCacheKey();return e.onBeforeCompile=(e,i)=>{r(e,i),Object.assign(e.uniforms,J,{uTideFollow:{value:+!!t},uTidePools:{value:+!!n}}),e.fragmentShader=e.fragmentShader.replace(`#include <common>`,`#include <common>
+uniform float uTideHigh;
+uniform float uTideNow;
+uniform float uTideFollow;
+uniform float uTidePools;`).replace(`inkGBuffer = vec4(inkN * 0.5 + 0.5, uLineWeight * inkPaint.a);`,`${ue}\n  inkGBuffer = vec4(inkN * 0.5 + 0.5, uLineWeight * inkPaint.a);`)},e.customProgramCacheKey=()=>`${i}+tide`,e}var Y=(e,t)=>de(_(e),t),X=`
+out vec3 vWorld;
+void main() {
+  vec4 w = modelMatrix * vec4(position, 1.0);
+  vWorld = w.xyz;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`,fe=`
+in vec3 vWorld;
+layout(location = 0) out vec4 outColor;
+uniform highp sampler3D tInkNoise;
+uniform highp sampler2D tDepth;
+uniform vec2 uRes;
+uniform float uNear, uFar, uTime, uStir;
+uniform vec3 uSeaSmear, uMist;
+float vn(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return texture(tInkNoise, (i + f + 0.5) / 64.0).r;
+}
+float linZ(float d) {
+  float n = d * 2.0 - 1.0;
+  return 2.0 * uNear * uFar / (uFar + uNear - n * (uFar - uNear));
+}
+void main() {
+  vec3 V = vWorld - cameraPosition;
+  float dist = length(V);
+  V /= dist;
+  vec3 base = vec3(0.070, 0.070, 0.066);
+
+  // The sky in the lacquer: only near the horizon, and a broad streak under the light.
+  float flatness = 1.0 - clamp(-V.y, 0.0, 1.0);
+  vec2 q = vWorld.xz;
+  float slow = vn(vec3(q * vec2(0.05, 0.19), uTime * 0.05));
+  float az = dot(normalize(V.xz), normalize(uSeaSmear.xz));
+  float smear = pow(clamp(az, 0.0, 1.0), 26.0) * (0.45 + slow * 0.8);
+  vec3 c = base + vec3(0.065) * pow(flatness, 5.0) + vec3(0.2) * smear * pow(flatness, 2.2);
+
+  // Thin, slow rings and long lines, at a size that holds with distance.
+  float r1 = vn(vec3(q * vec2(0.22, 0.6) + vec2(uTime * 0.06, 0.0), uTime * 0.07));
+  float r2 = vn(vec3(q * vec2(0.6, 0.2) - vec2(0.0, uTime * 0.05), 4.0 + uTime * 0.06));
+  float patches = smoothstep(0.56, 0.72, vn(vec3(q * 0.035, 9.0 + uTime * 0.01)));
+  float line = smoothstep(0.022, 0.0, abs(r1 - 0.5)) * 0.5 + smoothstep(0.016, 0.0, abs(r2 - 0.52)) * 0.3;
+  // Before it rises and while it does, the whole surface stirs: more lines, everywhere, and further out.
+  c += vec3(0.05 + 0.1 * uStir) * line * mix(patches, 1.0, uStir) * (1.0 - smoothstep(25.0 + 25.0 * uStir, 110.0 + 70.0 * uStir, dist));
+
+  // Where it meets rock: a dark lip, a thin wet gleam, and a soft dark edge.
+  float scene = linZ(texture(tDepth, gl_FragCoord.xy / uRes).r);
+  float me = linZ(gl_FragCoord.z);
+  float deep = (scene - me) * clamp(-V.y, 0.05, 1.0);
+  float wob = (vn(vec3(q * 1.3, uTime * 0.2)) - 0.5) * 0.05;
+  float gleam = smoothstep(0.02, 0.05, deep + wob) * smoothstep(0.17, 0.08, deep + wob);
+  c += vec3(0.32, 0.31, 0.29) * gleam * (1.0 - smoothstep(25.0, 90.0, dist));
+  c = mix(c * 0.72, c, smoothstep(0.1, 0.5, deep));
+
+  // Far away it goes into the mist the hills stand in.
+  // The edge wanders in long drifts, so the horizon is a soft wash and never a ruled line.
+  float drift = vn(vec3(q * vec2(0.006, 0.014), 21.0)) - 0.5 + 0.4 * (vn(vec3(q * vec2(0.02, 0.05), 25.0)) - 0.5);
+  float far = smoothstep(170.0, 620.0, dist + drift * 420.0);
+  c = mix(c, uMist, far * 0.96);
+  outColor = vec4(c, 1.0);
+}`,pe=`
+float vn(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return texture(tInkNoise, (i + f + 0.5) / 64.0).r;
+}`,me=`
+in vec3 vWorld;
+layout(location = 0) out vec4 outColor;
+uniform highp sampler3D tInkNoise;
+uniform highp sampler2D tDepth;
+uniform vec2 uRes;
+uniform float uNear, uFar;
+uniform float uSea, uTime;
+${pe}
+float linZ(float d) {
+  float n = d * 2.0 - 1.0;
+  return 2.0 * uNear * uFar / (uFar + uNear - n * (uFar - uNear));
+}
+void main() {
+  float d = uSea - vWorld.y;
+  // World y here is the mirrored one: under the water line it shows, over it it is rock's own wet foot.
+  if (d < 0.0) discard;
+  // Where a face is upright (pushed back flat for his climb, as on i5's west side) its copy lies on its own foot under the water.
+  // A tie there broke into pale and black blocks: the rock wins unless the copy is clearly in front of it.
+  if (linZ(gl_FragCoord.z) > linZ(texture(tDepth, gl_FragCoord.xy / uRes).r) - 0.03) discard;
+  float dist = length(vWorld - cameraPosition);
+  float streak = vn(vec3(vWorld.x * 0.22 + vWorld.z * 0.22, vWorld.y * 3.2 + uTime * 0.25, 5.0));
+  float k = exp(-d / 7.0) * mix(0.3, 1.0, smoothstep(0.3, 0.7, streak)) * (1.0 - smoothstep(70.0, 420.0, dist));
+  outColor = vec4(vec3(0.07, 0.07, 0.066) + vec3(0.25, 0.245, 0.23) * k, 1.0);
+}`;function he(){let e=new a({glslVersion:i,uniforms:{tInkNoise:v.tInkNoise,tDepth:v.tDepth,uRes:v.uRes,uNear:v.uNear,uFar:v.uFar,uSea:{value:0},uTime:{value:0}},vertexShader:X,fragmentShader:me,transparent:!0,depthWrite:!1,side:2,blending:5,blendEquation:104,blendSrc:201,blendDst:201});return e.name=`sea_mirror`,e.userData.inkPass=`post`,e}var ge=`
+in vec3 vWorld;
+layout(location = 0) out vec4 outColor;
+uniform highp sampler3D tInkNoise;
+uniform float uFade, uTime;
+uniform vec3 uArch;
+${pe}
+void main() {
+  float top = 11.2;
+  if (uArch.y > 0.0) {
+    float e = (vWorld.x - uArch.x) / uArch.y;
+    if (abs(e) >= 1.0) discard;
+    top = -3.0 + uArch.z * pow(1.0 - e * e, 0.31);
+    if (vWorld.y > top) discard;
+  }
+  float x = vWorld.x + vWorld.z * 0.3;
+  float y = vWorld.y;
+  // The ropes wander a little as they fall.
+  float wx = x + (vn(vec3(x * 0.35, y * 0.22 + uTime * 0.12, 3.0)) - 0.5) * 1.1;
+  float ropes = vn(vec3(wx * 0.75, 1.0, 1.0)) * 0.55 + vn(vec3(wx * 2.1, 5.0, 2.0)) * 0.32 + vn(vec3(wx * 5.3, y * 0.08, 4.0)) * 0.13;
+  float run = vn(vec3(wx * 3.1, y * 0.42 + uTime * 1.5, 6.0));
+  float heavy = smoothstep(5.5, 0.4, top - y) * 0.26;
+  float a = smoothstep(0.34, 0.5, ropes + (run - 0.5) * 0.22 + heavy);
+  a = mix(0.5, 0.985, a);
+  float sheen = smoothstep(0.62, 0.72, vn(vec3(wx * 6.5, y * 0.18 + uTime * 1.9, 8.0))) * smoothstep(0.6, 0.9, a);
+  vec3 c = vec3(0.045, 0.042, 0.04) + vec3(0.075, 0.074, 0.07) * sheen;
+  outColor = vec4(c, a * uFade);
+}`;function _e(e){let t=new a({glslVersion:i,uniforms:{tInkNoise:v.tInkNoise,uFade:{value:1},uTime:{value:0},uArch:{value:new r(...e??[0,0,0])}},vertexShader:X,fragmentShader:ge,transparent:!0,depthWrite:!1,side:2});return t.name=`sea_veil`,t.userData.inkPass=`post`,t}function ve(){let e=new a({glslVersion:i,uniforms:{tInkNoise:v.tInkNoise,tDepth:v.tDepth,uRes:v.uRes,uNear:v.uNear,uFar:v.uFar,uTime:{value:0},uStir:{value:0},uSeaSmear:{value:new r(.1,0,-1).normalize()},uMist:{value:new r(.62,.61,.6)}},vertexShader:X,fragmentShader:fe,transparent:!0,depthWrite:!1});return e.name=`sea_lacquer`,e.userData.inkPass=`post`,e}var ye=[86,8.6,14.4],Z={preset:`rock`,vertexPaint:!1,rampBias:.36,rampScale:.66,tint:[1,.995,.985],facetAmt:.14,facetFreq:.45,facetStretch:.5,crackAmt:.3,crackGate:.7,brushAmt:.2,pitAmt:.04,stainAmt:.22,speckAmt:.06,wrap:.45,skyFill:.6,streakAmp:.08,hueAmt:.3},be={...Z,rampBias:.44,rampScale:.54,facetAmt:.03,crackAmt:.14,brushAmt:.06,stainFreq:.34,stainAmt:.18,groundSqueeze:.6},Q={...Z,rampBias:.4,rampScale:.6,facetAmt:.08,crackAmt:.18,brushAmt:.12},xe={preset:`wood`,vertexPaint:!1,color:7169113,lineWeight:.8,shadeTint:[.6,.58,.56],wrap:.4,skyFill:.5},Se={preset:`wood`,vertexPaint:!1,color:6172453,lineWeight:.85,shadeTint:[.62,.58,.56],wrap:.4,skyFill:.5};async function Ce(){let e=c();return u(e,q.surfaces),f(e,q.edges),l(e,q.stones),h(e,y),{...q,world:e}}function we(){return{sea_rock:Y({...Z,name:`sea_rock`}),sea_top:Y({...be,name:`sea_top`}),sea_stone:Y({...Q,name:`sea_stone`}),sea_stair:Y({...Q,name:`sea_stair`},{pools:!1}),sea_wood:Y({...xe,side:2,name:`sea_wood`}),sea_float_wood:Y({...xe,side:2,name:`sea_float_wood`},{follow:!0}),sea_float_rock:Y({...Q,name:`sea_float_rock`},{follow:!0}),sea_lacquer:Y({...Se,name:`sea_lacquer_wood`}),sea_float_lacquer:Y({...Se,side:2,name:`sea_float_lacquer`},{follow:!0}),sea_pine:_({preset:`wood`,vertexPaint:!1,color:3486254,lineWeight:.9,shadeTint:[.7,.7,.72],wrap:.5,skyFill:.4,name:`sea_pine`}),sea_far:_({useRamp:!1,vertexPaint:!1,color:6251884,lineWeight:0,shadeTint:[.84,.86,.9],wrap:.9,skyFill:.8,name:`sea_far`}),sea_rope:_({preset:`wood`,vertexPaint:!1,color:9405031,lineWeight:.5,shadeTint:[.6,.58,.56],name:`sea_rope`}),sea_sail:_({useRamp:!1,vertexPaint:!1,color:11051668,side:2,lineWeight:.5,shadeTint:[.72,.71,.7],wrap:.6,skyFill:.5,name:`sea_sail`}),sea_paper:_({useRamp:!1,vertexPaint:!1,color:14208952,lineWeight:.5,shadeTint:[.8,.78,.74],wrap:.8,name:`sea_paper`})}}function Te(e,t){let n=new Map;return e.traverse(e=>{if(e.isMesh){let n=e.material?.name?.replace(/\.\d+$/,``);t[n]||console.error(`[ch5_sea] no material "${n}" for ${e.name}`),e.material=t[n];let r=e.name.startsWith(`monoliths`)||e.name.startsWith(`far_ranges`)||e.name.startsWith(`road_rock`)||e.name.startsWith(`pines`);e.castShadow=!r&&!e.name.startsWith(`pads_top`)&&!e.name.startsWith(`pads_wet`),e.receiveShadow=!r,e.name.startsWith(`rim_boulders`)&&g(e)}e.name&&n.set(e.name,e)}),n}function $(t,n,r){let i=new e;i.name=n;for(let e of r)i.add(e.clone());t.group.add(i)}async function Ee(t,r){J.uTideHigh.value=b.high;let i=await t.assets.loadGLTF(`levels/ch5_sea/sea.glb`);m(i.scene,q,/^(pads_|road_rock|stairs|monoliths)/,y.faces,{legs:1});let a=Te(i.scene,we()),s=e=>{let t=a.get(e);return t||console.error(`[ch5_sea] no mesh ${e} in sea.glb`),t};$(r,`boat1_node`,[s(`boat`)]),$(r,`grey_node`,[s(`boat`)]),$(r,`barge_node`,[s(`barge`),s(`barge_lamp`)]),$(r,`raft_node`,[s(`raft`),s(`raft_rope`)]),$(r,`slab_a_node`,[s(`slab`)]),$(r,`slab_b_node`,[s(`roof_slab`)]),$(r,`slab_c_node`,[s(`column_raft`)]);for(let[e,t]of[[`court_door_in`,-486.4],[`court_door_out`,-507.4]]){let n=s(e);n.position.set(125,x,t),r.group.add(n)}for(let e of[`boat`,`barge`,`barge_lamp`,`raft`,`raft_rope`,`slab`,`column_raft`,`roof_slab`])s(e).removeFromParent();r.drift=new e,r.drift.name=`drift`;for(let e of[`drift_wood`,`drift_lacquer`,`drift_rock`])r.drift.add(s(e));ee(r.drift),r.group.add(r.drift);let c=new e;c.name=`mirror`,c.scale.y=-1;let l=he();i.scene.updateMatrixWorld(!0);for(let e of[`pads_side`,`shoulders`,`rim_boulders`,`monoliths`,`torii`,`arches`,`broken_column`,`wreck`,`wreck3`,`wreck_sail`,`road_rock`,`marker_posts`]){let t=s(e),r=new n(t.geometry,l);r.position.copy(t.position),r.quaternion.copy(t.quaternion),r.renderOrder=-5,r.frustumCulled=!1,r.castShadow=!1,c.add(r)}r.group.add(c),r.mirror=c,r.mirrorMat=l,r.group.add(i.scene),r.curtains=[];let u=(e,t,i,a,s,c)=>{let l=new o(i-t,s+3);l.translate((t+i)/2,(s-3)/2,a);let u=new n(l,_e(c));u.name=e,u.renderOrder=6,u.frustumCulled=!1,r.group.add(u),r.curtains.push({mesh:u,z:a,fade:1})};F.forEach((e,t)=>u(`veil${t}_node`,77.4,94.6,e,11.4,ye)),u(`gate_veil_node`,184,199,B,11.2),r.mist=new e,r.mistMats=[];let f=new o(760,66);for(let e=0;e<6;e++){let t=e/6*Math.PI*2+.3,i=te({bank:!0,color:`#b0afad`,thin:`#b9b4aa`,alphaMax:.7,softZ:30,freq:.05}),a=new n(f,i);a.position.set(Math.cos(t)*430,20,Math.sin(t)*430),a.lookAt(0,20,0),a.renderOrder=3,a.frustumCulled=!1,r.mist.add(a),r.mistMats.push(i)}r.group.add(r.mist);let h=new o(3600,3600);h.rotateX(-Math.PI/2);let g=ve(),_=new n(h,g);_.name=`sea`,_.frustumCulled=!1,_.renderOrder=-10,r.group.add(_),r.seaMat=g,r.seaStir=0,await p(t,r),await d(t,r,{x:191.5,y:3.6,z:-600.5,width:9.5,height:5.8,lanterns:5}),r.flow={ended:!1,end:r.triggers.find(e=>e.id===`road_on`)},r.mech.get(`crow_bell`).onRing=()=>t.registry.get(`combat`)?.breakSwarm(`causeway_crows`)}function De(e,t){t.flow.ended=!1}function Oe(e,n,r){let i=r.mech.get(`sea`),a=i.y;J.uTideNow.value=a,r.drift.position.y=a+Math.sin(n.time.t*.7)*.05,r.seaMat.uniforms.uTime.value=n.time.t;let o=i.read?.().toRise??9,c=i.phase===`rising`?1:i.phase===`low`?t.smoothstep(2.5-o,0,2):0;r.seaStir+=(c-r.seaStir)*Math.min(1,e*3),r.seaMat.uniforms.uStir.value=r.seaStir,r.mirror.position.y=a*2,r.mirrorMat.uniforms.uSea.value=a,r.mirrorMat.uniforms.uTime.value=n.time.t;let l=n.camera.position;r.mist.position.set(l.x,0,l.z);for(let e of r.mistMats)e.uniforms.uTime.value=n.time.t;let u=n.registry.get(`player.body`)?.c;for(let t of r.curtains){let r=u&&Math.sign(u.z-t.z)!==Math.sign(l.z-t.z);t.fade+=((r?.14:1)-t.fade)*Math.min(1,e*6),t.mesh.material.uniforms.uFade.value=t.fade,t.mesh.material.uniforms.uTime.value=n.time.t}let d=n.registry.get(`game`),f=n.registry.get(`player.body`);d?.story&&f&&n.registry.get(`game.state`)===`PLAY`&&!r.flow.ended&&f.c.grounded&&d.run?.flags?.ch5_last_rock&&s(f.c.x,f.c.z,r.flow.end.poly)&&(r.flow.ended=!0,d.completeChapter())}export{De as enter,Ee as init,q as level,Ce as load,Oe as update};

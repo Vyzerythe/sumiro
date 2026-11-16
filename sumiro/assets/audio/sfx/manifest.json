@@ -1,0 +1,15 @@
+{
+ "catMeow": {
+  "gainDb": 6,
+  "target": -21.9,
+  "takes": [
+   {
+    "file": "catMeow_1.ogg",
+    "momentary": -27.9,
+    "truePeak": -19,
+    "take": "catMeow_p1_b3",
+    "seed": 300
+   }
+  ]
+ }
+}

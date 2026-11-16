@@ -1,0 +1,13 @@
+{
+ "notes": "Written by art/audio/tools/wind_loop.py. The wind loops [loopStart, loopEnd); lufs and truePeak are measured on the file. Its level in the game: ambience.js WIND_LUFS.",
+ "wind": {
+  "file": "wind.ogg",
+  "duration": 14.0,
+  "loopStart": 0.25,
+  "loopEnd": 13.75,
+  "lufs": -19.9,
+  "truePeak": -2.2,
+  "source": "wind_blowing_#4-1793990250153.wav",
+  "xfade": 1.5
+ }
+}
