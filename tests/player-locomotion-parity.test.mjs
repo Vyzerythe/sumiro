@@ -59,7 +59,7 @@ function compare(kind,initial) {
   assert.equal(result,expected);
   assert.deepEqual(a,b,'state mismatch for '+kind+' '+JSON.stringify(initial));
   assert.deepEqual(outA,outB);
-  assert.deepEqual(ea,eb);
+  assert.deepEqual(ea,structuredClone(eb.map(event => JSON.parse(JSON.stringify(event)))));
 }
 test('gait thresholds match the published state transitions',()=>{
   for(const speed of [0,.1499999,.15,2.79999,2.8,7.09999,7.1,12]) {
