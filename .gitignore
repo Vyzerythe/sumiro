@@ -1,0 +1,13 @@
+# Local development artifacts (published files in sumiro/ remain tracked)
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+node_modules/
+coverage/
+.cache/
+*.log
+.env
+.env.*
+!.env.example
+
