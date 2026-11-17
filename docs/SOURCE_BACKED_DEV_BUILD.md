@@ -2,7 +2,7 @@
 
 **Status:** An integration experiment, not the final rebuild of Sumiro.
 
-The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter and save modules into the actual original game runtime**.
+The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter, save and collectible-scroll modules into the actual original game runtime**.
 
 ## Build and serve
 
@@ -62,3 +62,5 @@ The browser test's package installation is transient to avoid presenting Playwri
 ## Next milestone
 
 Introduce an automated browser smoke test for both original and source-backed builds (boot, menu, new game, save/reload, and chapter flow) and compare observable behavior. Continue subsystem reconstruction only when the integration harness can detect regressions.
+
+**Output safety:** The builder only accepts direct root-level scratch directories named `.local-build` or `.local-build-*`, and rejects other paths before deleting any output. It never writes to `sumiro/`.

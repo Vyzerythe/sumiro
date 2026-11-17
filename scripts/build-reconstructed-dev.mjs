@@ -15,25 +15,28 @@ const root = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const outArg = process.argv.indexOf('--out');
 const output = resolve(root, outArg >= 0 ? process.argv[outArg + 1] ?? '' : '.local-build');
 if (outArg >= 0 && !process.argv[outArg + 1]) throw Error('--out requires a directory');
-if (output === root || !output.startsWith(root + '/')) {
-  throw Error('Output must be a dedicated directory inside the repository');
-}
-if ([resolve(root,'sumiro'), resolve(root,'src')].some(p => output === p || p.startsWith(output + '/'))) {
-  throw Error('Output would overwrite tracked source or published assets');
+const relativeOutput = output.slice(root.length + 1);
+// Only direct, untracked scratch directories are disposable. Never accept a
+// tracked path, a nested path under sumiro/src, or an ancestor of the repo.
+if (!output.startsWith(root + '/') || !/^\.local-build(?:-[a-z0-9-]+)?$/.test(relativeOutput)) {
+  throw Error('Output must be a root-level .local-build[-name] scratch directory');
 }
 
 const originalGame = join(root, 'sumiro/bundle/game-B5zfa1fm.js');
 const originalChapters = join(root, 'sumiro/bundle/chapters-B8aGs4KP.js');
+const originalKit = join(root, 'sumiro/bundle/kit-B01EgPBo.js');
 const EXPECTED_GIT_BLOBS = {
   game: '284349f2f8d0235e163f3c9b88b17ed222e3b269',
   chapters: '3da4e0f31fed783d0e548dd40fd0c1113cca16ec',
+  kit: 'd92a7b85baceb33cf9c7243a27fbfea98fa5436d',
 };
 const sha = data => createHash('sha1')
   .update('blob ' + Buffer.byteLength(data) + '\0')
   .update(data).digest('hex');
 const game = await readFile(originalGame);
 const chapters = await readFile(originalChapters);
-if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters) {
+const kit = await readFile(originalKit);
+if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters || sha(kit) !== EXPECTED_GIT_BLOBS.kit) {
   throw Error('Published bundle has changed: audit integration boundaries before rebuilding');
 }
 
@@ -64,12 +67,22 @@ const chapterAdapter = [
   '',
 ].join('\n');
 
+const kitSource = kit.toString('utf8');
+const catalogPattern = /var C=\{[\s\S]*?\},w=Object\.keys\(C\)\.length,T=\{[\s\S]*?\},E=\{preset:/;
+const catalogMatch = kitSource.match(catalogPattern);
+if (!catalogMatch || kitSource.match(/w=Object\.keys\(C\)\.length/g)?.length !== 1) {
+  throw Error('Published scroll catalog layout changed; re-audit before integrating');
+}
+const kitRewritten = "import { scrollTexts as C, scrollCount as w, scrollsByChapter as T } from '../../src/domain/scrolls.mjs';\\n"
+  + kitSource.replace(catalogPattern, 'var E={preset:');
+
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(join(root, 'sumiro'), join(output, 'sumiro'), { recursive: true });
 await cp(join(root, 'src'), join(output, 'src'), { recursive: true });
 await writeFile(join(output, 'sumiro/bundle/game-B5zfa1fm.js'), rewritten);
 await writeFile(join(output, 'sumiro/bundle/chapters-B8aGs4KP.js'), chapterAdapter);
+await writeFile(join(output, 'sumiro/bundle/kit-B01EgPBo.js'), kitRewritten);
 
 const report = {
   kind: 'transitional-source-backed-development-build',
@@ -77,8 +90,9 @@ const report = {
   adaptedChunks: [
     'sumiro/bundle/game-B5zfa1fm.js',
     'sumiro/bundle/chapters-B8aGs4KP.js',
+    'sumiro/bundle/kit-B01EgPBo.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');
