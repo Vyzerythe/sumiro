@@ -13,3 +13,4 @@ coverage/
 
 .local-build/
 .local-build-test/
+.local-build-browser/
