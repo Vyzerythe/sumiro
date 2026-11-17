@@ -46,6 +46,10 @@ jobs:
         run: node --test tests/player-locomotion-parity.test.mjs
       - name: Verify movement tuning constants against published player
         run: node --test tests/player-movement-config-parity.test.mjs
+      - name: Verify ledge-grab state and detection against compiled player
+        run: node --test tests/player-ledge-grab-parity.test.mjs
+      - name: Verify hanging, shimmy and climb transitions
+        run: node --test tests/player-ledge-controller-parity.test.mjs
       - name: Verify reconstructed saves against the published implementation
         run: node --test tests/save-parity.test.mjs
       - name: Verify source-backed development build
