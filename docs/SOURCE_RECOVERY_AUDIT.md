@@ -14,6 +14,25 @@
 | Existing build integrity | Ten JSON files parsed; the central audio index's music, voice, effect and ambience references resolved against the published tree. | These checks protect only a limited part of distribution integrity, not overall game behavior. |
 | Repository CI | GitHub Actions run [44006820190](https://github.com/Vyzerythe/sumiro/actions/runs/44006820190) completed its static integrity job successfully on foundation PR #1. | A useful baseline, but not an original-source build or gameplay test. |
 
+## Public creator and rights context
+
+Public sources identify Shikhar (`@xikhar`) as the creator of the original Sumiro game and describe development with Claude Code, Three.js, Blender, AI-assisted image/model generation, and other tools. This is consistent with the published commit's author account but **does not prove** that the editable source is available or that this repository owner has permission to redistribute or relicense reconstructed derivatives.
+
+References:
+- [Creator's published game discussion (indexed)](https://www.xitter.cf/xikhar)
+- [Creator workflow summary](https://amusehall.com/games/sumiro/)
+- [Another distribution's project description](https://github.com/1anc6/Sumiro/blob/main/README.md)
+
+Before substantial reconstruction for public distribution, confirm the original author(s)' licensing/permissions and whether they can supply the source checkout. The repository's public visibility is not a license grant.
+
+## Binary/module reconstruction baseline
+
+The inspected published distribution contains **57 compiled JavaScript modules, 2 WASM modules, 28 GLB assets, 25 OGG files, 10 JSON files**, and raster textures. The largest JavaScript modules include `index-DnHRwVtn.js` (~859 kB), `draco_decoder-fzg4nYZr.js` (~719 kB), `combat-Dp_zXhrv.js` (~75 kB), and `ink_material-CrFtRYQr.js` (~73 kB).
+
+Subsystem names visible in generated chunks include `player`, `camera_rig`, `collision`, `combat`, `audio`, `music`, `render_pipeline`, `ink_material`, `cutscene`, `hud`, `game`, six `ch*` chapter modules, and environment/fx modules. These names are **clues**, not proof of the original source layout. The entry bundle mixes library/runtime and game logic.
+
+The existing release contains compressed or hashed artifacts, so reconstructing readable modules is a *new implementation effort* rather than retrieving exact original comments, typings, or build configuration.
+
 ## Highest-value source recovery sequence
 
 1. **Ask the originating producer/maintainer for the working tree** corresponding to `ccba6cf`, plus `db75dae`. Search local and remote Git clones, bare repositories, worktrees, reflogs, backup snapshots, unpushed branches, and CI/build logs. Avoid publishing private files or secrets accidentally.
