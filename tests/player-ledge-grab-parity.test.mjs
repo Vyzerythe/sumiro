@@ -15,7 +15,9 @@ function buildLedges() {
   return [
     createLedgePath({id:'left', points:[[0,2.1,0,0,1],[1,2.1,0,0,1]]}),
     createLedgePath({id:'middle',points:[[0,2.1,0,0,1],[1,2.1,0,0,1]]}),
-    createLedgePath({id:'moving',body:{id:'platform',enabled:true},
+    createLedgePath({id:'moving',body:{id:'platform',enabled:true,
+      toWorld(x,y,z,out){out.x=x+3;out.y=y+.2;out.z=z;return out},
+      dirToWorld(x,z,out){out.ox=x;out.oz=z;return out}},
       points:[[0,2.1,0,0,1],[1,2.1,0,0,1]]}),
     createLedgePath({id:'distant', points:[[20,2.1,20,1,0],[21,2.1,20,1,0]]}),
   ];
