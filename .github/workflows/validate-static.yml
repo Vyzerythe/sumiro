@@ -54,6 +54,8 @@ jobs:
         run: node --test tests/player-mantle-parity.test.mjs
       - name: Verify player leap routing, flight, and landing parity
         run: node --test tests/player-leap-parity.test.mjs
+      - name: Verify player ground and airborne physics differential parity
+        run: node --test tests/player-motion-physics-parity.test.mjs
       - name: Verify reconstructed saves against the published implementation
         run: node --test tests/save-parity.test.mjs
       - name: Verify source-backed development build
