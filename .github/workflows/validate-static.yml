@@ -1,0 +1,70 @@
+name: Validate published build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrity:
+    name: Static distribution integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check executable browser harness syntax
+        run: node --check scripts/browser-smoke.mjs
+      - name: Validate published artifacts
+        run: node --test tests/static-build.test.mjs
+      - name: Verify reconstructed chapter behavior against published build
+        run: node --test tests/chapter-parity.test.mjs
+      - name: Verify reconstructed scroll catalog against published build
+        run: node --test tests/scroll-parity.test.mjs
+      - name: Verify recovered collision geometry against published build
+        run: node --test tests/geometry-parity.test.mjs
+      - name: Verify moving collision bodies against published engine
+        run: node --test tests/moving-body-parity.test.mjs
+      - name: Verify collision-world queries against compiled engine
+        run: node --test tests/world-parity.test.mjs
+      - name: Verify recovered player cinematic timing against published build
+        run: node --test tests/player-cinematic-parity.test.mjs
+      - name: Verify player ledge path against published build
+        run: node --test tests/player-ledge-parity.test.mjs
+      - name: Verify interactive player steering against published build
+        run: node --test tests/player-input-parity.test.mjs
+      - name: Verify locomotion and jump transitions against published player
+        run: node --test tests/player-locomotion-parity.test.mjs
+      - name: Verify movement tuning constants against published player
+        run: node --test tests/player-movement-config-parity.test.mjs
+      - name: Verify ledge-grab state and detection against compiled player
+        run: node --test tests/player-ledge-grab-parity.test.mjs
+      - name: Verify hanging, shimmy and climb transitions
+        run: node --test tests/player-ledge-controller-parity.test.mjs
+      - name: Verify low mantle probes, entry and completion
+        run: node --test tests/player-mantle-parity.test.mjs
+      - name: Verify player leap routing, flight, and landing parity
+        run: node --test tests/player-leap-parity.test.mjs
+      - name: Verify player ground and airborne physics differential parity
+        run: node --test tests/player-motion-physics-parity.test.mjs
+      - name: Verify reconstructed saves against the published implementation
+        run: node --test tests/save-parity.test.mjs
+      - name: Verify source-backed development build
+        run: node --test tests/integration-build.test.mjs
+      - name: Generate read-only module inventory
+        run: |
+          node scripts/inventory-bundle.mjs > bundle-inventory.json
+          node -e "const x = require('./bundle-inventory.json'); if (x.jsChunks < 1 || x.chunks.length !== x.jsChunks) process.exit(1)"
+
+
