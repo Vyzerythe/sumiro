@@ -108,9 +108,11 @@ const gaitFunction = /function Qe\(\)\{[\s\S]*?\}(?=function \$e\()/;
 const directionFunction = /function ot\(\)\{[\s\S]*?\}(?=function st\()/;
 const jumpFunction = /function at\(\)\{[\s\S]*?\}(?=function ot\()/;
 const fallFunction = /function it\(e=0\)\{[\s\S]*?\}(?=function at\()/;
+const ledgeGrabBlock = /function St\(e,t\)\{[\s\S]*?\}(?=function Tt\()/;
+const ledgeHangBlock = /function kt\(e\)\{[\s\S]*?\}(?=function Mt\()/;
 const headingFunction = /function U\(e,t\)\{[\s\S]*?\}(?=var Me=)/;
 const timelineFunctions = /function Ve\(e\)\{[\s\S]*?\}(?=var Ge=)/;
-if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText) || !steeringFunction.test(playerText) || !gaitFunction.test(playerText) || !directionFunction.test(playerText) || !jumpFunction.test(playerText) || !fallFunction.test(playerText)) {
+if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText) || !steeringFunction.test(playerText) || !gaitFunction.test(playerText) || !directionFunction.test(playerText) || !jumpFunction.test(playerText) || !fallFunction.test(playerText) || !ledgeGrabBlock.test(playerText) || !ledgeHangBlock.test(playerText)) {
   throw Error('Player cinematic timing boundary changed: re-audit');
 }
 const playerRewritten = [
@@ -119,13 +121,25 @@ const playerRewritten = [
   "import { updateInputSteering } from '../../src/player/input-steering.mjs';",
   "import { classifyGroundGait, selectTravelDirection, beginJump, beginFall } from '../../src/player/locomotion.mjs';",
   "import { movementConfig as O } from '../../src/player/movement-config.mjs';",
+  "import { alignToLedge, beginLedgeGrab, detectLedgeGrab } from '../../src/player/ledge-grab.mjs';",
+  "import { shimmyAlongLedge, updateLedgeHang, completeLedgeClimb } from '../../src/player/ledge-controller.mjs';",
   playerText.replace(playerConfig, 'var k=O,ee=24').replace(headingFunction, '').replace(timelineFunctions, '').replace(ledgeFactory, '')
     .replace(steeringFunction,
       'function Le(e){updateInputSteering(q,m,p.get(`camera_rig.rail`),sn.script,e,k.buffer,me)}')
     .replace(gaitFunction,'function Qe(){classifyGroundGait(q)}')
     .replace(directionFunction,'function ot(){selectTravelDirection(q,U)}')
     .replace(jumpFunction,'function at(){beginJump(q,k,{detach:Be,play:(clip,options)=>y.play(clip,options),footstep:qt,setState:J})}')
-    .replace(fallFunction,'function it(e=0){beginFall(q,k,{detach:Be,play:(clip,options)=>y.play(clip,options),setState:J},e)}'),
+    .replace(fallFunction,'function it(e=0){beginFall(q,k,{detach:Be,play:(clip,options)=>y.play(clip,options),setState:J},e)}')
+    .replace(ledgeGrabBlock, [
+      'function St(e,t){beginLedgeGrab(q,e,t,O,K,j,A,(clip,options)=>y.play(clip,options),J)}',
+      'function Ct(){alignToLedge(q,O,K,j,A)}',
+      'function wt(){return detectLedgeGrab(q,C.values(),O,j,A,Pe()?k.assistReach:1,St)}',
+    ].join(''))
+    .replace(ledgeHangBlock, [
+      'function kt(e){updateLedgeHang(q,m,e,ye,{drop:Dt,align:Ct,leapBack:Et,leapSide:Tt,climbOrLeap:Ot,shimmy:At,changeState:J})}',
+      'function At(e,t){shimmyAlongLedge(q,t,e,p.get(`camera_rig.rail`)?.railYaw??0,k.shimmyRate,Ct,J)}',
+      'function jt(){completeLedgeClimb(q,K,y,v,{forwardOffset:N,heightGain:M,surface:Y},J)}',
+    ].join('')),
 ].join('\n');
 
 await rm(output, { recursive: true, force: true });
@@ -148,7 +162,7 @@ const report = {
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');

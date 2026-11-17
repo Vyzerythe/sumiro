@@ -46,6 +46,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputPlayer, /src\/player\/input-steering\.mjs/);
     assert.match(outputPlayer, /src\/player\/locomotion\.mjs/);
     assert.match(outputPlayer, /src\/player\/movement-config\.mjs/);
+    assert.match(outputPlayer, /src\/player\/ledge-grab\.mjs/);
+    assert.match(outputPlayer, /src\/player\/ledge-controller\.mjs/);
+    assert.match(outputPlayer, /function St\(e,t\)\{beginLedgeGrab/);
+    assert.match(outputPlayer, /function kt\(e\)\{updateLedgeHang/);
+    assert.match(outputPlayer, /function jt\(\)\{completeLedgeClimb/);
     assert.doesNotMatch(outputPlayer, /var O=\{/);
     assert.match(outputPlayer, /function at\(\)\{beginJump/);
     assert.match(outputPlayer, /function it\(e=0\)\{beginFall/);
@@ -89,6 +94,10 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.equal(movement.state,'IDLE');
     const movementConfig = await import(pathToFileURL(join(out,'src/player/movement-config.mjs')).href);
     assert.equal(movementConfig.movementConfig.gravity,24);
+    const grab = await import(pathToFileURL(join(out,'src/player/ledge-grab.mjs')).href);
+    assert.equal(typeof grab.detectLedgeGrab, 'function');
+    const controller = await import(pathToFileURL(join(out,'src/player/ledge-controller.mjs')).href);
+    assert.equal(typeof controller.completeLedgeClimb, 'function');
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {
