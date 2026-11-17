@@ -78,8 +78,12 @@ async function serve(directory) {
 const servers = [];
 const interaction = process.argv.includes('--interaction');
 const sandbox = process.argv.includes('--play');
+const gapLeap = process.argv.includes('--gap-leap');
+const referenceOnly = process.argv.includes('--reference-only');
 if (interaction && sandbox) throw Error('--play and --interaction are mutually exclusive');
 if (process.argv.includes('--jump') && !sandbox) throw Error('--jump requires --play');
+if (gapLeap && (!sandbox || process.argv.includes('--jump'))) throw Error('--gap-leap requires --play without --jump');
+if (referenceOnly && !gapLeap) throw Error('--reference-only requires --gap-leap');
 let browser;
 async function observe(label, port) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -114,6 +118,145 @@ async function observe(label, port) {
       if (![before.x, before.y, before.z, before.t].every(Number.isFinite)) {
         throw Error('Sandbox player position or simulation clock is not finite');
       }
+      if (gapLeap) {
+        console.log(label + ': locating real Chapter One gap-forward leap geometry');
+        const prepared = await page.evaluate(() => {
+          const engine = window.__engine;
+          const game = window.__game;
+          const body = engine?.registry?.get('player.body');
+          const level = game?.level;
+          const leap = level?.leapLinks?.find(link => link.id === 'gap_forward');
+          const ledge = level?.ledges?.find(item => item.id === leap?.to?.ledge);
+          if (!body?.teleport || !body.c || !leap?.from?.poly || !ledge?.points) {
+            throw Error('Missing published player/level leap instrumentation');
+          }
+          const polygon = leap.from.poly;
+          const minX = Math.min(...polygon.map(point => point[0]));
+          const maxX = Math.max(...polygon.map(point => point[0]));
+          const minZ = Math.min(...polygon.map(point => point[1]));
+          const maxZ = Math.max(...polygon.map(point => point[1]));
+          const inside = (x,z) => {
+            let result = false;
+            for(let i=0,j=polygon.length-1;i<polygon.length;j=i++) {
+              const [xi,zi] = polygon[i], [xj,zj] = polygon[j];
+              if((zi>z)!==(zj>z) && x<((xj-xi)*(z-zi))/(zj-zi)+xi) result=!result;
+            }
+            return result;
+          };
+          // The source level specifies rim position in the sampled point
+          // index domain, independent from the engine's runtime arc length.
+          const from = ledge.rimFrom ?? 0;
+          const step = ledge.rimStep ?? 1;
+          const firstIndex = Math.max(0,Math.round((leap.to.sFrom-from)/step));
+          const lastIndex = Math.min(ledge.points.length-1,
+            Math.round((leap.to.sTo-from)/step));
+          const candidates = [];
+          const groundExamples=[];
+          for(let xi=0;xi<=24;xi++) for(let zi=0;zi<=24;zi++) {
+            const x=minX+(maxX-minX)*(xi+.5)/25;
+            const z=minZ+(maxZ-minZ)*(zi+.5)/25;
+            if(!inside(x,z))continue;
+            const ground=game.world.groundAt(x,z);
+            if (groundExamples.length < 8) groundExamples.push([x,z,ground?.y??null]);
+            if(!ground || ground.y < (leap.from.yMin ?? -Infinity) + .08)continue;
+            for(let index=firstIndex;index<=lastIndex;index++) {
+              const point=ledge.points[index];
+              if(!point)continue;
+              const dx=point[0]-x,dz=point[2]-z;
+              const length=Math.hypot(dx,dz);
+              if(length<.2)continue;
+              candidates.push({x,z,y:ground.y,
+                directionX:dx/length,directionZ:dz/length,
+                distance:length,pointIndex:index});
+            }
+          }
+          candidates.sort((a,b)=>a.distance-b.distance);
+          if(!candidates.length) return {
+            found:false,poly:polygon,groundExamples,rim:{from,step,firstIndex,lastIndex},
+          };
+          const chosen=candidates[Math.floor(candidates.length*.25)];
+          body.script={x:chosen.directionX,z:chosen.directionZ,mag:1};
+          body.teleport(chosen.x,chosen.z,{
+            y:chosen.y,
+            heading:Math.atan2(-chosen.directionX,-chosen.directionZ),
+          });
+          body.c.recentSpeed=8;
+          return {found:true,chosen,count:candidates.length,groundExamples,
+            level:level.id,link:leap.id};
+        });
+        console.log(label + ': authored leap setup ' + JSON.stringify(prepared));
+        if(!prepared.found) throw Error('No ground-supported candidate in published gap-forward source polygon');
+        await page.waitForFunction(() => {
+          const body=window.__engine?.registry?.get('player.body');
+          if(body)body.c.recentSpeed=Math.max(body.c.recentSpeed,8);
+          return window.__game?.read?.()?.leapReady === 'gap_forward';
+        },null,{timeout:45000});
+        console.log(label + ': authored gap-forward link available; injecting buffered jump');
+        await page.evaluate(() => {
+          const body=window.__engine.registry.get('player.body');
+          window.__gapTrace=[];
+          let frames=0;
+          const capture=()=>{
+            const now=window.__game?.read?.();
+            if(now)window.__gapTrace.push({
+              state:now.state,t:now.t,ledge:now.ledge,
+              leapReady:now.leapReady,grounded:now.grounded,
+              x:now.x,y:now.y,z:now.z,
+            });
+            if(++frames<900)requestAnimationFrame(capture);
+          };
+          requestAnimationFrame(capture);
+          body.c.jumpBuf=.3;
+        });
+        await page.waitForFunction(() =>
+          window.__gapTrace?.some(item => item.state === 'LEAP'),
+        null,{timeout:60000});
+        console.log(label + ': authored LEAP observed, awaiting rim GRAB');
+        await page.waitForFunction(() =>
+          window.__gapTrace?.some(item =>
+            ['GRAB','HANG','SHIMMY','CLIMB'].includes(item.state) &&
+            item.ledge === 'rim_front'),
+        null,{timeout:120000});
+        // Preserve the source input contract: the scripted vector is only for
+        // positioning/aim; W is the actual climb command in hanging states.
+        await page.evaluate(() => {
+          window.__engine.registry.get('player.body').script=null;
+        });
+        await page.keyboard.down('w');
+        try {
+          await page.waitForFunction(() =>
+            window.__gapTrace?.some(item => item.state === 'CLIMB'),
+          null,{timeout:90000});
+          await page.waitForFunction(() => {
+            const trace=window.__gapTrace ?? [];
+            const climbIndex=trace.findIndex(item=>item.state==='CLIMB');
+            return climbIndex>=0 &&
+              trace.slice(climbIndex+1).some(item=>item.state==='IDLE' && item.grounded);
+          },null,{timeout:120000});
+        } finally {
+          await page.keyboard.up('w');
+        }
+        const trace=await page.evaluate(() => window.__gapTrace ?? []);
+        const states=[...new Set(trace.map(item=>item.state))];
+        const after=await page.evaluate(() => window.__game.read());
+        movementSummary={
+          game:after.game,level:after.level,finite:
+            [after.x,after.y,after.z,after.t].every(Number.isFinite),
+          authoredLeap:{
+            link:'gap_forward',
+            initial:prepared.chosen,
+            states,
+            reachedRim:trace.some(item=>item.ledge==='rim_front'),
+            climbed:trace.some(item=>item.state==='CLIMB') &&
+              after.state==='IDLE' && after.grounded,
+            finalState:after.state,
+          },
+        };
+        if(!movementSummary.finite || !movementSummary.authoredLeap.climbed) {
+          throw Error('Real authored gap leap/climb did not reach grounded IDLE');
+        }
+        console.log(label + ': authored leap and climb ' + JSON.stringify(movementSummary));
+      } else {
       console.log(label + ': PLAY ready; pressing W to test actual locomotion');
       await page.keyboard.down('w');
       try {
@@ -190,6 +333,7 @@ async function observe(label, port) {
           throw Error('Sandbox jump failed to return to valid gameplay/ground state');
         }
       }
+      }
 
     } else {
       console.log(label + ': boot overlay removed; checking title menu');
@@ -238,6 +382,7 @@ async function observe(label, port) {
     console.error(label + ': errors=' + JSON.stringify(errors));
     console.error(label + ': missing=' + JSON.stringify(missing));
     if (sandbox) console.error(label + ': recent jump samples=' + JSON.stringify(await page.evaluate(() => window.__jumpTrace?.slice(-12) ?? []).catch(() => [])));
+    if (gapLeap) console.error(label + ': authored gap trace=' + JSON.stringify(await page.evaluate(() => window.__gapTrace?.slice(-20) ?? []).catch(() => [])));
     console.error(label + ': diagnostic=' + JSON.stringify(await page.evaluate(() => ({
       title: document.title,
       engineExists: !!window.__engine,
@@ -258,15 +403,15 @@ try {
     args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
   const original = await observe('published-reference', servers[0].port);
-  const candidate = await observe('source-backed-development', servers[1].port);
+  const candidate = referenceOnly ? null : await observe('source-backed-development', servers[1].port);
   if (!original.launched || original.errors.length || original.missing.length) {
     throw Error('Published baseline failed browser gate; cannot assert parity with a broken reference');
   }
-  if (!candidate.launched || candidate.errors.length || candidate.missing.length) {
+  if (!referenceOnly && (!candidate.launched || candidate.errors.length || candidate.missing.length)) {
     throw Error('Source-backed build failed browser boot or asset resolution gate');
   }
-  if (candidate.title !== original.title) throw Error('Document title mismatch');
-  if (sandbox) {
+  if (!referenceOnly && candidate.title !== original.title) throw Error('Document title mismatch');
+  if (sandbox && !referenceOnly) {
     if (!original.movementSummary || !candidate.movementSummary ||
         original.movementSummary.level !== candidate.movementSummary.level ||
         original.movementSummary.game !== candidate.movementSummary.game ||
@@ -277,12 +422,14 @@ try {
       throw Error('Published and source-backed PLAY state or movement baseline differ');
     }
   }
-  if (original.bootVisible || candidate.bootVisible) throw Error('Boot overlay did not disappear');
-  if (original.canvasCount !== candidate.canvasCount) throw Error('Canvas count mismatch');
-  if (interaction && JSON.stringify(original.saveSummary) !== JSON.stringify(candidate.saveSummary)) {
+  if (original.bootVisible || (!referenceOnly && candidate.bootVisible)) throw Error('Boot overlay did not disappear');
+  if (!referenceOnly && original.canvasCount !== candidate.canvasCount) throw Error('Canvas count mismatch');
+  if (interaction && !referenceOnly && JSON.stringify(original.saveSummary) !== JSON.stringify(candidate.saveSummary)) {
     throw Error('New-game saved state differs between original and source-backed builds');
   }
-  process.stdout.write(sandbox
+  process.stdout.write(gapLeap
+    ? (referenceOnly ? 'Published reference completed authored gap leap and climb.\n' : 'Both builds completed authored gap leap and climb.\n')
+    : sandbox
     ? (process.argv.includes('--jump')
         ? 'Both builds entered PLAY, moved and completed a jump/ground contact with finite player states.\n'
         : 'Both builds entered sandbox PLAY and demonstrated keyboard locomotion with finite player states.\n')
