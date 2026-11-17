@@ -34,6 +34,8 @@ jobs:
         run: node --test tests/geometry-parity.test.mjs
       - name: Verify moving collision bodies against published engine
         run: node --test tests/moving-body-parity.test.mjs
+      - name: Verify collision-world queries against compiled engine
+        run: node --test tests/world-parity.test.mjs
       - name: Verify reconstructed saves against the published implementation
         run: node --test tests/save-parity.test.mjs
       - name: Verify source-backed development build
