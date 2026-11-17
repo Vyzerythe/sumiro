@@ -84,9 +84,15 @@ const collisionTail = /function a\(e,t,n,r=\[\]\)\{[\s\S]*?\}function o\(e,t,n\)
 if (!collisionTail.test(collisionText)) throw Error('Collision geometry function boundary changed: re-audit');
 const bodyPattern = /function n\(e,t\)\{[\s\S]*?\}(?=function r\(e\)\{)/;
 if (!bodyPattern.test(collisionText)) throw Error('Collision moving-body factory boundary changed: re-audit');
+const originalWorldFactory = /function i\(\)\{[\s\S]*?(?=export\{a as n,o as r,i as t\};$)/;
+const collisionWithoutGeometryOrBody = collisionText.replace(bodyPattern, '').replace(collisionTail, '');
+if (!originalWorldFactory.test(collisionWithoutGeometryOrBody)) {
+  throw Error('Collision world factory boundary changed: re-audit');
+}
 const collisionRewritten = "import { extrudeWallPolyline as a, pointInPolygon as o } from '../../src/physics/geometry.mjs';\n"
   + "import { createMovingTriangleBody as n } from '../../src/physics/moving-body.mjs';\n"
-  + collisionText.replace(bodyPattern, '').replace(collisionTail, '');
+  + "import { createCollisionWorld as i } from '../../src/physics/world.mjs';\n"
+  + collisionWithoutGeometryOrBody.replace(originalWorldFactory, '');
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
@@ -106,7 +112,7 @@ const report = {
     'sumiro/bundle/kit-B01EgPBo.js',
     'sumiro/bundle/collision-DtBQEpmQ.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');

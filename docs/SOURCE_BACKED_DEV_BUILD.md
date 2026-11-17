@@ -73,3 +73,7 @@ The exported polyline extrusion and polygon-containment routines have executable
 ### Moving collision body
 
 The development build now sources the moving-triangle body factory from `src/physics/moving-body.mjs`. It preserves matrix transforms, velocities, bounds, triangle filtering, and carrying points on moving surfaces. Differential tests compare the readable source with `world.addBody(...)` from the unchanged published collision module, including empty bodies and repeated poses. Full world collision, raycasts, and capsule sweeps remain compiled.
+
+### Source-backed collision world
+
+The isolated development build now redirects the collision world's entire public factory to `src/physics/world.mjs`. This includes grid indexing, group filtering, height queries, ray casts, capsule sweeps, disc contacts, and moving-body registration. The parity tests (`tests/world-parity.test.mjs`) execute both implementations on fixed geometry, dynamic bodies, and seeded random queries. The resulting game build must also pass the Chromium title-screen smoke test; this still does not establish full gameplay or frame-by-frame movement equivalence.

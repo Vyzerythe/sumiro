@@ -38,6 +38,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputKit, /src\/domain\/scrolls\.mjs/);
     assert.match(outputCollision, /src\/physics\/geometry\.mjs/);
     assert.match(outputCollision, /src\/physics\/moving-body\.mjs/);
+    assert.match(outputCollision, /src\/physics\/world\.mjs/);
+    assert.doesNotMatch(outputCollision, /function i\(\)\{/);
     assert.doesNotMatch(outputKit, /w=Object\.keys\(C\)\.length/);
     assert.match(index, /bundle\/index-/);
     assert.equal(JSON.parse(report).kind, 'transitional-source-backed-development-build');
