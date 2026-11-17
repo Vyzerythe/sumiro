@@ -80,6 +80,8 @@ let browser;
 async function observe(label, port) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
+  page.setDefaultTimeout(12000);
+  console.log(label + ': launching page');
   const errors = [];
   const missing = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -95,10 +97,13 @@ async function observe(label, port) {
       return !!(canvas && canvas.width > 0 && canvas.height > 0);
     }, null, { timeout: 90000 }).then(() => true, () => false);
     await page.waitForTimeout(2000);
-    await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 20000 });
+    console.log(label + ': canvas ready, checking title menu');
+    await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 15000 });
     const titleMenu = await page.locator('#ink-ui .menu.on h1').textContent();
     if (titleMenu?.trim() !== 'Sumiro') throw Error('Unexpected title screen: ' + titleMenu);
+    console.log(label + ': clicking New Game');
     await page.locator('#ink-ui .menu.on li').filter({ hasText: /^New Game$/ }).click();
+    console.log(label + ': waiting for persisted save');
     await page.waitForFunction(() => {
       const save = localStorage.getItem('sumiro.save.v1');
       if (!save) return false;
@@ -109,10 +114,12 @@ async function observe(label, port) {
       } catch {
         return false;
       }
-    }, null, { timeout: 90000 });
+    }, null, { timeout: 45000 });
+    console.log(label + ': save persisted, waiting for PLAY state');
     await page.waitForFunction(() => {
       return window.__engine?.registry?.get('game.state') === 'PLAY';
-    }, null, { timeout: 90000 });
+    }, null, { timeout: 45000 });
+    console.log(label + ': PLAY state confirmed');
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sumiro.save.v1')));
     const saveSummary = {
       version: saved.v, chapter: saved.chapter, unlocked: saved.unlocked,
@@ -127,6 +134,18 @@ async function observe(label, port) {
     const result = { label, launched, ...state, titleMenu, saveSummary, errors: errors.slice(0, 12), missing: missing.slice(0, 12) };
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     return result;
+  } catch (error) {
+    console.error(label + ': FAILED: ' + error.message);
+    console.error(label + ': errors=' + JSON.stringify(errors));
+    console.error(label + ': missing=' + JSON.stringify(missing));
+    console.error(label + ': diagnostic=' + JSON.stringify(await page.evaluate(() => ({
+      title: document.title,
+      engineExists: !!window.__engine,
+      state: window.__engine?.registry?.get('game.state') ?? null,
+      menu: document.querySelector('#ink-ui .menu.on')?.innerText?.slice(0, 200) ?? null,
+      savePresent: !!localStorage.getItem('sumiro.save.v1'),
+    })).catch(() => null)));
+    throw error;
   } finally {
     await context.close();
   }
