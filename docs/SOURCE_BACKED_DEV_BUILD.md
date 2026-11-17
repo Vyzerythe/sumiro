@@ -2,7 +2,7 @@
 
 **Status:** An integration experiment, not the final rebuild of Sumiro.
 
-The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter, save, collectible-scroll and collision-geometry modules into the actual original game runtime**.
+The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter, save, collectible-scroll and collision-geometry/moving-body modules into the actual original game runtime**.
 
 ## Build and serve
 
@@ -69,3 +69,7 @@ Introduce an automated browser smoke test for both original and source-backed bu
 ## Collision geometry reconstruction
 
 The exported polyline extrusion and polygon-containment routines have executable parity tests against the original generated collision chunk, using representative boundaries, winding order, deterministic seeded polygons, callback order and output identity. The collision-world engine, moving bodies, capsule sweeps, and raycasts remain compiled; only the two independently testable geometry helpers are source-backed at this stage.
+
+### Moving collision body
+
+The development build now sources the moving-triangle body factory from `src/physics/moving-body.mjs`. It preserves matrix transforms, velocities, bounds, triangle filtering, and carrying points on moving surfaces. Differential tests compare the readable source with `world.addBody(...)` from the unchanged published collision module, including empty bodies and repeated poses. Full world collision, raycasts, and capsule sweeps remain compiled.

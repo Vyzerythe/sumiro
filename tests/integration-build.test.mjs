@@ -37,6 +37,7 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputChapters, /src\/domain\/chapters\.mjs/);
     assert.match(outputKit, /src\/domain\/scrolls\.mjs/);
     assert.match(outputCollision, /src\/physics\/geometry\.mjs/);
+    assert.match(outputCollision, /src\/physics\/moving-body\.mjs/);
     assert.doesNotMatch(outputKit, /w=Object\.keys\(C\)\.length/);
     assert.match(index, /bundle\/index-/);
     assert.equal(JSON.parse(report).kind, 'transitional-source-backed-development-build');
@@ -51,6 +52,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.equal(geometry.pointInPolygon(3, 3, [[0,0],[5,0],[5,5],[0,5]]), true);
     const collisionAdapter = await import(pathToFileURL(join(out,collision)).href);
     assert.equal(collisionAdapter.r(3, 3, [[0,0],[5,0],[5,5],[0,5]]), true);
+    const movingWorld = collisionAdapter.t();
+    const movingBody = movingWorld.addBody('test', [{positions:[0,0,0, 1,0,0, 0,0,1]}]);
+    assert.equal(movingBody.tris.length, 1);
+    movingBody.setPose(2,1,0,0,0,0,1);
+    assert.deepEqual(movingBody.toWorld(0,0,0), {x:2,y:1,z:0});
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {
