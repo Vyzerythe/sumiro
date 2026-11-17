@@ -16,7 +16,7 @@ function get(pattern,label) {
 const original={
   ground:get(/function ze\(e\)\{[\s\S]*?\}(?=function Be\(\)\{)/,'ground movement'),
   air:get(/function vt\(e\)\{[\s\S]*?\}(?=function yt\(\)\{)/,'air movement'),
-  landing:get(/function bt\(e\)\{[\s\S]*?\}(?=function xt\(\)\{)/,'landing'),
+  landing:get(/function bt\(e\)\{[\s\S]*?\}(?=function xt\(e\)\{)/,'landing'),
 };
 const normalize=x=>JSON.parse(JSON.stringify(x,(key,value)=>{
   if(key==='carrier'&&value?.id)return value.id;
