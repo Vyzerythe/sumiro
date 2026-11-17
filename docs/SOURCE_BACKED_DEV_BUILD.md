@@ -83,3 +83,7 @@ The isolated development build now redirects the collision world's entire public
 The original player module remains primarily compiled. The isolated development build now imports a source reconstruction of the **scripted player cinematic timeline** from `src/player/cinematic-timeline.mjs`: heading interpolation, animation-frame curves, sequence state labels, and surface classification. Differential tests cover boundary values, extrapolation, and seeded samples against the pinned compiled player bundle.
 
 This does **not** reconstruct interactive locomotion, climbing, the animation skeleton, or player physics. These are separate, larger integration milestones.
+
+### Player ledge-path integration
+
+A second player subsystem is now source-backed: `src/player/ledge-path.mjs` reconstructs the X/Z arc-length sampling of ledge points, normalized outward directions, world-space transformations for attached moving bodies, and the published 0.1-unit nearest-grip lookup. Its differential test covers moving platforms, duplicate points, edge samples, and range restrictions. It does **not** replace the full climbing state machine, physics integration, or animation/IK solver.

@@ -98,14 +98,16 @@ const collisionRewritten = "import { extrudeWallPolyline as a, pointInPolygon as
   + collisionWithoutGeometryOrBody.replace(originalWorldFactory, '');
 
 const playerText = player.toString('utf8');
+const ledgeFactory = /function Ae\(e\)\{[\s\S]*?\}(?=function je\()/;
 const headingFunction = /function U\(e,t\)\{[\s\S]*?\}(?=var Me=)/;
 const timelineFunctions = /function Ve\(e\)\{[\s\S]*?\}(?=var Ge=)/;
-if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText)) {
+if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText)) {
   throw Error('Player cinematic timing boundary changed: re-audit');
 }
 const playerRewritten = [
   "import { interpolateHeading as U, runAnimationFrame as Ve, jogAnimationFrame as He, timelineState as Ue, timelineSurface as We } from '../../src/player/cinematic-timeline.mjs';",
-  playerText.replace(headingFunction, '').replace(timelineFunctions, ''),
+  "import { createLedgePath as Ae } from '../../src/player/ledge-path.mjs';",
+  playerText.replace(headingFunction, '').replace(timelineFunctions, '').replace(ledgeFactory, ''),
 ].join('\n');
 
 await rm(output, { recursive: true, force: true });
@@ -128,7 +130,7 @@ const report = {
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');

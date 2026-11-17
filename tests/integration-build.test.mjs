@@ -42,6 +42,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputCollision, /src\/physics\/moving-body\.mjs/);
     assert.match(outputCollision, /src\/physics\/world\.mjs/);
     assert.match(outputPlayer, /src\/player\/cinematic-timeline\.mjs/);
+    assert.match(outputPlayer, /src\/player\/ledge-path\.mjs/);
+    assert.doesNotMatch(outputPlayer, /function Ae\(e\)\{/);
     assert.doesNotMatch(outputPlayer, /function U\(e,t\)\{/);
     assert.doesNotMatch(outputCollision, /function i\(\)\{/);
     assert.doesNotMatch(outputKit, /w=Object\.keys\(C\)\.length/);
@@ -65,6 +67,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.deepEqual(movingBody.toWorld(0,0,0), {x:2,y:1,z:0});
     const timeline = await import(pathToFileURL(join(out,'src/player/cinematic-timeline.mjs')).href);
     assert.equal(timeline.timelineState(205), 'LEAP');
+    const ledges = await import(pathToFileURL(join(out,'src/player/ledge-path.mjs')).href);
+    assert.equal(ledges.createLedgePath({points:[[0,0,0,1,0],[3,0,4,1,0]]}).length,5);
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {
