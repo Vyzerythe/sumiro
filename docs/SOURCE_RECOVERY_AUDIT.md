@@ -16,7 +16,7 @@
 
 ## Publisher-mirror discovery and provenance boundary
 
-The public repository [xikhar/xikhar.github.io](https://github.com/xikhar/xikhar.github.io) exposes the **same complete Git tree** (SHA `290cd0d4cfd3898ee321ceddffc8df4909ccef48`) as the published `Vyzerythe/sumiro` commit. This is strong evidence of an exact artifact mirror associated with the publisher, **not** proof of an available editable source tree or of any rights grant.
+The public repository [xikhar/xikhar.github.io](https://github.com/xikhar/xikhar.github.io) exposes the **same Git commit** (`290cd0d4cfd3898ee321ceddffc8df4909ccef48`) and corresponding tree (`ddb2edb9b7caa72aca7678e5fbf4d298041c9478`) as the published `Vyzerythe/sumiro` commit. This is strong evidence of an exact artifact mirror associated with the publisher, **not** proof of an available editable source tree or of any rights grant.
 
 Public repository inspection found `xikhar/beyond-fable` and `xikhar/persona` to contain conventional source project files (`package.json`, source directories, and Vite configuration). They are **different projects** and must not be imported or assumed to share the Sumiro toolchain. No public repository identified in these searches was confirmed to contain editable Sumiro source.
 
