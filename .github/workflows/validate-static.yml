@@ -26,6 +26,8 @@ jobs:
           node-version: '22'
       - name: Validate published artifacts
         run: node --test tests/static-build.test.mjs
+      - name: Verify reconstructed chapter behavior against published build
+        run: node --test tests/chapter-parity.test.mjs
       - name: Generate read-only module inventory
         run: |
           node scripts/inventory-bundle.mjs > bundle-inventory.json
