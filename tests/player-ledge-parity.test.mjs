@@ -51,7 +51,9 @@ test('ledge sampling matches published interpolation and moving-body transforms'
       assert.strictEqual(found.at(distance,destinationA),destinationA);
       assert.strictEqual(expected.at(distance,destinationB),destinationB);
       assert.deepEqual(destinationA,destinationB);
-      assert.deepEqual(found.at(distance),plain(expected.at(distance)));
+      assert.deepEqual(plain(found.at(distance)),plain(expected.at(distance)));
+      // Preserve a separate non-finite check: JSON normalization maps NaN to null.
+      if (distance === undefined) assert.ok(Number.isNaN(found.at(distance).x));
     }
   }
 });
