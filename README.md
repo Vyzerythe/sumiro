@@ -30,6 +30,8 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 
 Run `node --test tests/static-build.test.mjs` with Node.js 22 or later. The check validates the distributable entry point, local JavaScript imports, JSON syntax, and referenced audio assets. It does **not** build the game, simulate gameplay, or prove rendering and audio work in browsers. See [release checks](docs/RELEASE_CHECKLIST.md) for manual testing.
 
+For a reproducible inventory of the generated JS module graph, run `node scripts/inventory-bundle.mjs > bundle-inventory.json`; the output is a local, read-only report, not recovered source.
+
 ## Documentation
 
 - [Architecture and repository boundaries](docs/ARCHITECTURE.md)
