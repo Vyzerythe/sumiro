@@ -33,6 +33,8 @@ Subsystem names visible in generated chunks include `player`, `camera_rig`, `col
 
 The existing release contains compressed or hashed artifacts, so reconstructing readable modules is a *new implementation effort* rather than retrieving exact original comments, typings, or build configuration.
 
+The committed [read-only inventory tool](../scripts/inventory-bundle.mjs) emits a deterministic JSON listing of each shipped JavaScript chunk's size and its statically discernible local module references. Run `node scripts/inventory-bundle.mjs > bundle-inventory.json` after checking out the repository. Treat this output as evidence for planning, not as source code or a complete dependency graph (runtime-computed imports and non-module asset loaders are outside its scope).
+
 ## Highest-value source recovery sequence
 
 1. **Ask the originating producer/maintainer for the working tree** corresponding to `ccba6cf`, plus `db75dae`. Search local and remote Git clones, bare repositories, worktrees, reflogs, backup snapshots, unpushed branches, and CI/build logs. Avoid publishing private files or secrets accidentally.
