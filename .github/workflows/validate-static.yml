@@ -42,6 +42,8 @@ jobs:
         run: node --test tests/player-ledge-parity.test.mjs
       - name: Verify interactive player steering against published build
         run: node --test tests/player-input-parity.test.mjs
+      - name: Verify locomotion and jump transitions against published player
+        run: node --test tests/player-locomotion-parity.test.mjs
       - name: Verify reconstructed saves against the published implementation
         run: node --test tests/save-parity.test.mjs
       - name: Verify source-backed development build
