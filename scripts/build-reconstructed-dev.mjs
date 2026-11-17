@@ -26,11 +26,13 @@ const originalGame = join(root, 'sumiro/bundle/game-B5zfa1fm.js');
 const originalChapters = join(root, 'sumiro/bundle/chapters-B8aGs4KP.js');
 const originalKit = join(root, 'sumiro/bundle/kit-B01EgPBo.js');
 const originalCollision = join(root, 'sumiro/bundle/collision-DtBQEpmQ.js');
+const originalPlayer = join(root, 'sumiro/bundle/player-1_KrBWnI.js');
 const EXPECTED_GIT_BLOBS = {
   game: '284349f2f8d0235e163f3c9b88b17ed222e3b269',
   chapters: '3da4e0f31fed783d0e548dd40fd0c1113cca16ec',
   kit: 'd92a7b85baceb33cf9c7243a27fbfea98fa5436d',
   collision: 'bb06154a9be5a24421a017f4c84adf7c87064d1b',
+  player: '2ba1dbb18011510e025d5f3af06b045f143a3d10',
 };
 const sha = data => createHash('sha1')
   .update('blob ' + Buffer.byteLength(data) + '\0')
@@ -39,7 +41,8 @@ const game = await readFile(originalGame);
 const chapters = await readFile(originalChapters);
 const kit = await readFile(originalKit);
 const collision = await readFile(originalCollision);
-if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters || sha(kit) !== EXPECTED_GIT_BLOBS.kit || sha(collision) !== EXPECTED_GIT_BLOBS.collision) {
+const player = await readFile(originalPlayer);
+if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters || sha(kit) !== EXPECTED_GIT_BLOBS.kit || sha(collision) !== EXPECTED_GIT_BLOBS.collision || sha(player) !== EXPECTED_GIT_BLOBS.player) {
   throw Error('Published bundle has changed: audit integration boundaries before rebuilding');
 }
 
@@ -94,6 +97,17 @@ const collisionRewritten = "import { extrudeWallPolyline as a, pointInPolygon as
   + "import { createCollisionWorld as i } from '../../src/physics/world.mjs';\n"
   + collisionWithoutGeometryOrBody.replace(originalWorldFactory, '');
 
+const playerText = player.toString('utf8');
+const headingFunction = /function U\(e,t\)\{[\s\S]*?\}(?=var Me=)/;
+const timelineFunctions = /function Ve\(e\)\{[\s\S]*?\}(?=var Ge=)/;
+if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText)) {
+  throw Error('Player cinematic timing boundary changed: re-audit');
+}
+const playerRewritten = [
+  "import { interpolateHeading as U, runAnimationFrame as Ve, jogAnimationFrame as He, timelineState as Ue, timelineSurface as We } from '../../src/player/cinematic-timeline.mjs';",
+  playerText.replace(headingFunction, '').replace(timelineFunctions, ''),
+].join('\\n');
+
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(join(root, 'sumiro'), join(output, 'sumiro'), { recursive: true });
@@ -102,6 +116,7 @@ await writeFile(join(output, 'sumiro/bundle/game-B5zfa1fm.js'), rewritten);
 await writeFile(join(output, 'sumiro/bundle/chapters-B8aGs4KP.js'), chapterAdapter);
 await writeFile(join(output, 'sumiro/bundle/kit-B01EgPBo.js'), kitRewritten);
 await writeFile(join(output, 'sumiro/bundle/collision-DtBQEpmQ.js'), collisionRewritten);
+await writeFile(join(output, 'sumiro/bundle/player-1_KrBWnI.js'), playerRewritten);
 
 const report = {
   kind: 'transitional-source-backed-development-build',
@@ -111,8 +126,9 @@ const report = {
     'sumiro/bundle/chapters-B8aGs4KP.js',
     'sumiro/bundle/kit-B01EgPBo.js',
     'sumiro/bundle/collision-DtBQEpmQ.js',
+    'sumiro/bundle/player-1_KrBWnI.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');

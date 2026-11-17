@@ -77,3 +77,9 @@ The development build now sources the moving-triangle body factory from `src/phy
 ### Source-backed collision world
 
 The isolated development build now redirects the collision world's entire public factory to `src/physics/world.mjs`. This includes grid indexing, group filtering, height queries, ray casts, capsule sweeps, disc contacts, and moving-body registration. The parity tests (`tests/world-parity.test.mjs`) execute both implementations on fixed geometry, dynamic bodies, and seeded random queries. The resulting game build must also pass the Chromium title-screen smoke test; this still does not establish full gameplay or frame-by-frame movement equivalence.
+
+### Player cinematic timing
+
+The original player module remains primarily compiled. The isolated development build now imports a source reconstruction of the **scripted player cinematic timeline** from `src/player/cinematic-timeline.mjs`: heading interpolation, animation-frame curves, sequence state labels, and surface classification. Differential tests cover boundary values, extrapolation, and seeded samples against the pinned compiled player bundle.
+
+This does **not** reconstruct interactive locomotion, climbing, the animation skeleton, or player physics. These are separate, larger integration milestones.
