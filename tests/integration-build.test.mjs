@@ -22,7 +22,7 @@ test('source-backed build preserves originals and binds live domain imports', as
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    const after = await Promise.all([game, chapters, kit].map(p => readFile(join(root,p))));
+    const after = await Promise.all([game, chapters, kit, collision].map(p => readFile(join(root,p))));
     assert.deepEqual(after.map(hash), before.map(hash), 'published files changed');
     const [outputGame, outputChapters, outputKit, outputCollision, report, index] = await Promise.all([
       readFile(join(out,game),'utf8'),
