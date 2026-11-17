@@ -22,7 +22,7 @@ The `assets/` hierarchy groups media by purpose (for example `audio/`, `backdrop
 
 ## What is available versus still missing
 
-- **Available on the reconstruction branch:** readable chapter/save/scroll code, collision geometry and moving-body code; executable parity comparisons with the compiled implementation; isolated development-build assembly; title-screen Chromium smoke coverage.
+- **Available on the reconstruction branch:** readable chapter/save/scroll code, collision geometry, moving-body and full collision-world query code (ground, raycast, capsule sweep, grid); executable parity comparisons with the compiled implementation; isolated development-build assembly; title-screen Chromium smoke coverage.
 - **Still missing:** the original, complete editable game source, its canonical source architecture and historical authoring files, dependency/lockfile-based application build toolchain, and a **fully source-compiled** production build.
 - **Still unverified:** representative gameplay, save/reload and chapter progression in the source-backed runtime; full browser/device compatibility; asset ownership, licenses and reproducible production output.
 
@@ -38,5 +38,5 @@ The release commit on `main` is labeled `Publish Sumiro build from sumiro@ccba6c
 
 ## Reconstruction boundary
 
-The recovered `src/` hierarchy is intentionally incremental: domain modules and selected physics operations use unambiguous public interfaces and are compared against the compiled reference. The development builder copies the artifact to an ignored scratch directory and rewires only pinned, audited chunk boundaries. This is **a transitional compatibility bridge**, not a finished authoring toolchain. Future production architecture must be selected after core engine modules, dependency ownership and browser-level gameplay gates are understood.
+The recovered `src/` hierarchy is intentionally incremental: domain modules and the reconstructed collision-world factory use unambiguous public interfaces and are compared against the compiled reference. The development builder copies the artifact to an ignored scratch directory and rewires only pinned, audited chunk boundaries. This is **a transitional compatibility bridge**, not a finished authoring toolchain. Future production architecture must be selected after core engine modules, dependency ownership and browser-level gameplay gates are understood.
 

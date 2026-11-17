@@ -34,7 +34,7 @@ The tests ensure that:
 - checked-in JSON configuration files have valid syntax;
 - files identified by the audio index and audio manifests actually exist.
 
-**Additional test coverage:** chapter progression functions, save migration and storage behavior, collectible scroll data, collision geometry, and moving-body transforms are tested against the published compiled implementation. CI separately boots both builds in Chromium and verifies a visible title menu with no uncaught JS/network failures.
+**Additional test coverage:** chapter progression functions, save migration and storage behavior, collectible scroll data, collision geometry, moving-body transforms, spatial indexing, ground queries, raycasts and capsule sweeps are tested against the published compiled implementation. CI separately boots both builds in Chromium and verifies a visible title menu with no uncaught JS/network failures.
 
 **Not yet verified:** gameplay progression beyond the title, audio output, realistic rendering, complete source-build reproducibility and cross-browser support. The opt-in New Game interaction probe is currently inconclusive on the *published reference* under headless software rendering. See [the development-build guide](SOURCE_BACKED_DEV_BUILD.md) and [manual release checks](RELEASE_CHECKLIST.md).
 

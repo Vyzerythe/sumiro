@@ -22,8 +22,8 @@ This plan separates what can be improved **in the published-artifact repository 
 
 ## P1.5 — progressive engine reconstruction
 
-- [x] Integrate chapter, save, scroll and selected collision physics source into a guarded, isolated development build.
-- [ ] Reconstruct the remaining collision world (capsule sweeps, raycasts, spatial indexing), player motion, game state, HUD, audio, and rendering from evidence, with differential tests.
+- [x] Integrate chapter, save, scroll and the collision-world factory (spatial queries, raycasts, capsule sweeps, moving bodies) into a guarded, isolated development build, with differential tests.
+- [ ] Reconstruct player motion, game state, HUD, audio, rendering, and remaining scene/engine dependencies with independent parity checks.
 - [ ] Resolve the published game's headless `CHAPTER_CARD` transition diagnostic and establish an authoritative gameplay/browser test baseline.
 - [ ] Replace the transitional chunk adapter with an explicit, versioned, reproducible source build only after application dependency and parity gates pass.
 

@@ -2,7 +2,7 @@
 
 Sumiro is a browser-based 3D game spanning six chapters. **The production game in `sumiro/` is a compiled distribution.** The `work/source-reconstruction` branch contains an incremental, independently tested **reconstruction** of selected source modules, but not the original, complete upstream source project.
 
-> **Development status:** This branch can build a separate source-backed development copy using readable chapter, save, scroll and collision-physics helpers. Most game systems are still compiled artifacts. The original authoring project, source-build toolchain, and complete gameplay parity are **not** recovered or verified. Nothing under the published `sumiro/` directory is modified.
+> **Development status:** This branch can build a separate source-backed development copy using readable chapter, save, scroll and reconstructed collision-world modules. Most game systems are still compiled artifacts. The original authoring project, source-build toolchain, and complete gameplay parity are **not** recovered or verified. Nothing under the published `sumiro/` directory is modified.
 
 ## Run the published build locally
 
@@ -20,11 +20,11 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 | `sumiro/bundle/` | Generated, content-hashed JavaScript and WASM runtime assets |
 | `sumiro/assets/` | Game models, textures, audio, and JSON asset data |
 | `src/domain/` | Reconstructed chapter, save, and scroll game logic |
-| `src/physics/` | Reconstructed collision geometry and moving-body logic |
+| `src/physics/` | Reconstructed collision world, raycasts, capsule sweeps, spatial grid and moving-body logic |
 | `scripts/build-reconstructed-dev.mjs` | Guarded, isolated source-backed development build |
 | `scripts/browser-smoke.mjs` | Chromium boot/title comparison against the published game |
 | `.nojekyll` | Bypasses Jekyll processing on compatible static hosting |
-| `tests/` | Distribution-level integrity tests, not gameplay tests |
+| `tests/` | Distribution integrity, differential behavioral parity and development-build checks (not full gameplay tests) |
 | `.github/workflows/` | Automated repository validation |
 | `docs/` | Architecture, development, deployment, licensing, and release guidance |
 
