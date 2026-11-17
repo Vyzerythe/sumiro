@@ -11,7 +11,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
+const root = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const outArg = process.argv.indexOf('--out');
 const output = resolve(root, outArg >= 0 ? process.argv[outArg + 1] ?? '' : '.local-build');
 if (outArg >= 0 && !process.argv[outArg + 1]) throw Error('--out requires a directory');
