@@ -96,8 +96,10 @@ async function observe(label, port) {
       const canvas = document.querySelector('canvas');
       return !!(canvas && canvas.width > 0 && canvas.height > 0);
     }, null, { timeout: 90000 }).then(() => true, () => false);
-    await page.waitForTimeout(2000);
-    console.log(label + ': canvas ready, checking title menu');
+    if (!launched) throw Error('No WebGL canvas appeared during initial boot');
+    console.log(label + ': canvas initialized, waiting for completed engine boot');
+    await page.waitForFunction(() => !document.querySelector('#boot'), null, { timeout: 90000 });
+    console.log(label + ': boot overlay removed; checking title menu');
     await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 15000 });
     const titleMenu = await page.locator('#ink-ui .menu.on h1').textContent();
     if (titleMenu?.trim() !== 'Sumiro') throw Error('Unexpected title screen: ' + titleMenu);
