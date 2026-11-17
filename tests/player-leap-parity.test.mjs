@@ -82,6 +82,10 @@ function compareLifecycle(initial, opts, stepTimes) {
   assert.deepEqual(clean(a.K),clean(b.K));
   assert.deepEqual(a.events,b.events);
   for(const seconds of stepTimes) {
+    if (!a.q.leap || !b.q.leap) {
+      assert.equal(!!a.q.leap, !!b.q.leap, 'different leap completion/abort state');
+      break;
+    }
     a.q.stateT=b.q.stateT=seconds;
     const aOld=a.events.length,bOld=b.events.length;
     advanceLeap(a.q,a.K,.016,a.k,a.effects);
