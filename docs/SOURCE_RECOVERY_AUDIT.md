@@ -14,13 +14,13 @@
 | Existing build integrity | Ten JSON files parsed; the central audio index's music, voice, effect and ambience references resolved against the published tree. | These checks protect only a limited part of distribution integrity, not overall game behavior. |
 | Repository CI | GitHub Actions run [44006820190](https://github.com/Vyzerythe/sumiro/actions/runs/44006820190) completed its static integrity job successfully on foundation PR #1. | A useful baseline, but not an original-source build or gameplay test. |
 
-## Publisher-mirror discovery and provenance boundary
+## Known fork origin and source boundary
 
-The public repository [xikhar/xikhar.github.io](https://github.com/xikhar/xikhar.github.io) exposes the **same Git commit** (`290cd0d4cfd3898ee321ceddffc8df4909ccef48`) and corresponding tree (`ddb2edb9b7caa72aca7678e5fbf4d298041c9478`) as the published `Vyzerythe/sumiro` commit. This is strong evidence of an exact artifact mirror associated with the publisher, **not** proof of an available editable source tree or of any rights grant.
+**Confirmed by the fork maintainer:** `Vyzerythe/sumiro` was forked from [xikhar/xikhar.github.io](https://github.com/xikhar/xikhar.github.io). Both repositories contain the same published Git commit (`290cd0d4cfd3898ee321ceddffc8df4909ccef48`) and tree (`ddb2edb9b7caa72aca7678e5fbf4d298041c9478`). This is *known project history*, not a newly discovered upstream source location. The upstream GitHub Pages repository likewise contains the published build rather than an independently verified editable source tree.
 
 Public repository inspection found `xikhar/beyond-fable` and `xikhar/persona` to contain conventional source project files (`package.json`, source directories, and Vite configuration). They are **different projects** and must not be imported or assumed to share the Sumiro toolchain. No public repository identified in these searches was confirmed to contain editable Sumiro source.
 
-The publishing commit's author is `xikhar`; independently corroborating authorship, asset rights, and the original source maintainer still requires direct evidence. Avoid treating secondary descriptions of creator identities or tools as verified licensing statements.
+The publishing commit's author is `xikhar`; asset rights and availability of the original development checkout remain unverified. Avoid treating secondary descriptions of creator identities or tools as verified licensing statements.
 
 **Tracking limitation:** GitHub Issues is disabled in `Vyzerythe/sumiro` as of this investigation (attempting to create the source recovery issue returned HTTP 410). Until Issues is explicitly enabled, the task and its acceptance criteria are tracked here and in the roadmap rather than in an issue.
 
