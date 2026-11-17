@@ -77,6 +77,8 @@ async function serve(directory) {
 }
 const servers = [];
 const interaction = process.argv.includes('--interaction');
+const sandbox = process.argv.includes('--play');
+if (interaction && sandbox) throw Error('--play and --interaction are mutually exclusive');
 let browser;
 async function observe(label, port) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -90,7 +92,7 @@ async function observe(label, port) {
     if (response.status() >= 400) missing.push(response.status() + ' ' + new URL(response.url()).pathname);
   });
   try {
-    await page.goto('http://127.0.0.1:' + port + '/sumiro/', {
+    await page.goto('http://127.0.0.1:' + port + '/sumiro/' + (sandbox ? '?play=1' : ''), {
       waitUntil: 'domcontentloaded', timeout: 30000,
     });
     const launched = await page.waitForFunction(() => {
@@ -100,10 +102,49 @@ async function observe(label, port) {
     if (!launched) throw Error('No WebGL canvas appeared during initial boot');
     console.log(label + ': canvas initialized, waiting for completed engine boot');
     await page.waitForFunction(() => !document.querySelector('#boot'), null, { timeout: 90000 });
-    console.log(label + ': boot overlay removed; checking title menu');
-    await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 15000 });
-    const titleMenu = await page.locator('#ink-ui .menu.on h1').textContent();
-    if (titleMenu?.trim() !== 'Sumiro') throw Error('Unexpected title screen: ' + titleMenu);
+    let titleMenu = null;
+    let movementSummary = null;
+    if (sandbox) {
+      console.log(label + ': boot overlay removed; waiting for sandbox PLAY');
+      await page.waitForFunction(() => window.__game?.read?.()?.game === 'PLAY', null, {
+        timeout: 60000,
+      });
+      const before = await page.evaluate(() => window.__game.read());
+      if (![before.x, before.y, before.z, before.t].every(Number.isFinite)) {
+        throw Error('Sandbox player position or simulation clock is not finite');
+      }
+      console.log(label + ': PLAY ready; pressing W to test actual locomotion');
+      await page.keyboard.down('w');
+      try {
+        await page.waitForFunction(initial => {
+          const now = window.__game?.read?.();
+          return !!now && now.game === 'PLAY' &&
+            now.t > initial.t + .10 &&
+            Math.hypot(now.x - initial.x, now.z - initial.z) > .04;
+        }, {x:before.x,z:before.z,t:before.t}, {timeout:60000});
+      } finally {
+        await page.keyboard.up('w');
+      }
+      const after = await page.evaluate(() => window.__game.read());
+      movementSummary = {
+        game: after.game,
+        level: after.level,
+        moved: Math.hypot(after.x-before.x, after.z-before.z),
+        simulatedSeconds: after.t-before.t,
+        initialState: before.state,
+        finalState: after.state,
+        finite: [after.x,after.y,after.z,after.t,after.heading,after.speed].every(Number.isFinite),
+      };
+      if (!movementSummary.finite || movementSummary.moved <= .04 ||
+          movementSummary.simulatedSeconds <= .10 || movementSummary.game !== 'PLAY') {
+        throw Error('Sandbox locomotion did not produce valid forward movement');
+      }
+    } else {
+      console.log(label + ': boot overlay removed; checking title menu');
+      await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 15000 });
+      titleMenu = await page.locator('#ink-ui .menu.on h1').textContent();
+      if (titleMenu?.trim() !== 'Sumiro') throw Error('Unexpected title screen: ' + titleMenu);
+    }
     let saveSummary = null;
     if (interaction) {
     console.log(label + ': clicking New Game');
@@ -137,7 +178,7 @@ async function observe(label, port) {
       bootVisible: !!document.querySelector('#boot') &&
         getComputedStyle(document.querySelector('#boot')).display !== 'none',
     }));
-    const result = { label, launched, ...state, titleMenu, saveSummary, errors: errors.slice(0, 12), missing: missing.slice(0, 12) };
+    const result = { label, launched, ...state, titleMenu, saveSummary, movementSummary, errors: errors.slice(0, 12), missing: missing.slice(0, 12) };
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     return result;
   } catch (error) {
@@ -172,13 +213,22 @@ try {
     throw Error('Source-backed build failed browser boot or asset resolution gate');
   }
   if (candidate.title !== original.title) throw Error('Document title mismatch');
+  if (sandbox) {
+    if (!original.movementSummary || !candidate.movementSummary ||
+        original.movementSummary.level !== candidate.movementSummary.level ||
+        original.movementSummary.game !== candidate.movementSummary.game ||
+        !original.movementSummary.finite || !candidate.movementSummary.finite) {
+      throw Error('Published and source-backed PLAY state or movement baseline differ');
+    }
+  }
   if (original.bootVisible || candidate.bootVisible) throw Error('Boot overlay did not disappear');
   if (original.canvasCount !== candidate.canvasCount) throw Error('Canvas count mismatch');
   if (interaction && JSON.stringify(original.saveSummary) !== JSON.stringify(candidate.saveSummary)) {
     throw Error('New-game saved state differs between original and source-backed builds');
   }
-  process.stdout.write(interaction
-    ? 'Both builds booted, entered PLAY, and persisted matching saves.\n'
+  process.stdout.write(sandbox
+    ? 'Both builds entered sandbox PLAY and demonstrated keyboard locomotion with finite player states.\n'
+    : interaction ? 'Both builds booted, entered PLAY, and persisted matching saves.\n'
     : 'Both builds completed boot to the title menu without errors.\n');
 } finally {
   await browser?.close();

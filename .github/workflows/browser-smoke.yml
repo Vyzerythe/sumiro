@@ -29,3 +29,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Boot both builds and compare failures
         run: node scripts/browser-smoke.mjs
+      - name: Verify sandbox gameplay movement in both builds
+        run: node scripts/browser-smoke.mjs --play

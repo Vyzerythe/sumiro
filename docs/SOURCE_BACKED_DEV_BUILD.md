@@ -91,3 +91,7 @@ A second player subsystem is now source-backed: `src/player/ledge-path.mjs` reco
 ### Interactive player steering
 
 The source-backed development player now also calls `src/player/input-steering.mjs` from its live input update function. This covers camera-relative movement direction, analog stick magnitude, scripted movement overrides, zone transition heading locks, gradual yaw correction, and jump buffering. Differential tests compare an extracted original player function against the readable implementation using stateful multi-frame sequences and edge cases. **The full walking/jumping/climbing controller remains compiled.** Title-screen browser parity is a necessary smoke gate, not proof of in-game movement behavior.
+
+## Sandbox gameplay regression gate
+
+The published game's own `?play=1` URL mode bypasses the title-card transition and enters a no-save sandbox. The Chromium workflow exercises this mode with `node scripts/browser-smoke.mjs --play`, waits for the public player debug state to report `PLAY`, presses W, and requires finite player telemetry with actual horizontal movement on both the published reference and source-backed development copy. It compares qualitative gameplay contracts instead of imposing identical frame timings on headless software-rendered WebGL. This is a **movement smoke test**, not a complete combat/climbing/visual-equivalence certification. It runs with isolated browser contexts and does not write production player saves.
