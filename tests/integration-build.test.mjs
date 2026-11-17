@@ -50,6 +50,10 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputPlayer, /src\/player\/ledge-controller\.mjs/);
     assert.match(outputPlayer, /src\/player\/mantle\.mjs/);
     assert.match(outputPlayer, /src\/player\/leap\.mjs/);
+    assert.match(outputPlayer, /src\/player\/motion-physics\.mjs/);
+    assert.match(outputPlayer, /function ze\(e\)\{return stepGroundContact/);
+    assert.match(outputPlayer, /function vt\(e\)\{stepAirborne/);
+    assert.match(outputPlayer, /function bt\(e\)\{finishLanding/);
     assert.match(outputPlayer, /function dt\(e\)\{advanceLeap/);
     assert.match(outputPlayer, /function ut\(e,t\)\{beginLeap/);
     assert.doesNotMatch(outputPlayer, /function st\(e\)\{ot\(\);let t=U\.x/);
@@ -112,6 +116,9 @@ test('source-backed build preserves originals and binds live domain imports', as
     const leap = await import(pathToFileURL(join(out,'src/player/leap.mjs')).href);
     assert.equal(typeof leap.advanceLeap, 'function');
     assert.equal(typeof leap.findLeapLink, 'function');
+    const playerMotion = await import(pathToFileURL(join(out,'src/player/motion-physics.mjs')).href);
+    assert.equal(typeof playerMotion.stepAirborne,'function');
+    assert.equal(typeof playerMotion.finishLanding,'function');
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {

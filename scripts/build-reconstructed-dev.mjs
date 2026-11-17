@@ -112,9 +112,12 @@ const ledgeGrabBlock = /function St\(e,t\)\{[\s\S]*?\}(?=function Tt\()/;
 const ledgeHangBlock = /function kt\(e\)\{[\s\S]*?\}(?=function Mt\()/;
 const lowMantleBlock = /function pt\(e=1\)\{[\s\S]*?\}(?=function _t\(\))/;
 const leapLifecycleBlock = /function st\(e\)\{[\s\S]*?\}(?=function pt\(e=1\)\{)/;
+const groundMotionBlock = /function ze\(e\)\{[\s\S]*?\}(?=function Be\(\)\{)/;
+const airMotionBlock = /function vt\(e\)\{[\s\S]*?\}(?=function yt\(\)\{)/;
+const landingBlock = /function bt\(e\)\{[\s\S]*?\}(?=function xt\(e\)\{)/;
 const headingFunction = /function U\(e,t\)\{[\s\S]*?\}(?=var Me=)/;
 const timelineFunctions = /function Ve\(e\)\{[\s\S]*?\}(?=var Ge=)/;
-if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText) || !steeringFunction.test(playerText) || !gaitFunction.test(playerText) || !directionFunction.test(playerText) || !jumpFunction.test(playerText) || !fallFunction.test(playerText) || !ledgeGrabBlock.test(playerText) || !ledgeHangBlock.test(playerText) || !lowMantleBlock.test(playerText) || !leapLifecycleBlock.test(playerText)) {
+if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText) || !steeringFunction.test(playerText) || !gaitFunction.test(playerText) || !directionFunction.test(playerText) || !jumpFunction.test(playerText) || !fallFunction.test(playerText) || !ledgeGrabBlock.test(playerText) || !ledgeHangBlock.test(playerText) || !lowMantleBlock.test(playerText) || !leapLifecycleBlock.test(playerText) || !groundMotionBlock.test(playerText) || !airMotionBlock.test(playerText) || !landingBlock.test(playerText)) {
   throw Error('Player cinematic timing boundary changed: re-audit');
 }
 const playerRewritten = [
@@ -127,6 +130,7 @@ const playerRewritten = [
   "import { shimmyAlongLedge, updateLedgeHang, completeLedgeClimb } from '../../src/player/ledge-controller.mjs';",
   "import { probeLowMantle, probeWallMantle, beginLowMantle, updateLowMantle } from '../../src/player/mantle.mjs';",
   "import { resolveLeapRim, resolveLeapTarget, findLeapLink, beginLeap, advanceLeap, abortLeap } from '../../src/player/leap.mjs';",
+  "import { stepGroundContact, stepAirborne, finishLanding } from '../../src/player/motion-physics.mjs';",
   playerText.replace(playerConfig, 'var k=O,ee=24').replace(headingFunction, '').replace(timelineFunctions, '').replace(ledgeFactory, '')
     .replace(steeringFunction,
       'function Le(e){updateInputSteering(q,m,p.get(`camera_rig.rail`),sn.script,e,k.buffer,me)}')
@@ -158,7 +162,13 @@ const playerRewritten = [
       'function ut(e,t){beginLeap(q,K,e,t,k,{lockHeading:Re,play:(name,opts)=>y.play(name,opts),duration:name=>y.duration(name),footstep:qt,changeState:J})}',
       'function dt(e){advanceLeap(q,K,e,k,{finished:()=>y.finished(),play:(name,opts)=>y.play(name,opts),duration:name=>y.duration(name),scratch:O,ledgeOffset:j,hangingHeight:A,collisionUntil:Oe,world:v,capsule:De,collision:E,abort:ft,top:()=>y.top(),grab:St,land:bt})}',
       'function ft(){abortLeap(q,K,k,{collision:E,deflect:Ue,play:(name,opts)=>y.play(name,opts),changeState:J})}',
-    ].join('')),
+    ].join(''))
+    .replace(groundMotionBlock,
+      'function ze(e){return stepGroundContact(q,e,k,{world:v,collision:E,bodyCapsule:G,probeOffset:ke,hasSupport:We,hasSafeDrop:Ge,hasHigherGround:Ke,estimateNormal:X,deflect:Ue,surfaceName:Y})}')
+    .replace(airMotionBlock,
+      'function vt(e){stepAirborne(q,e,k,{jumpHeld:m.jumpHeld,collision:E,world:v,guardedCapsule:Ee,normalCapsule:Te,deflect:Ue,groundTolerance:L,play:(name,opts)=>y.play(name,opts),changeState:J,grabLedge:wt,land:bt,tryWallMantle:mt,probeMantle:pt,beginMantle:ht,updateFall:yt,surfaceName:Y})}')
+    .replace(landingBlock,
+      'function bt(e){finishLanding(q,e,k,{world:v,shake:Ie,sound:name=>p.set(`audio.cue`,{name}),hurt:Ht,isDead:Fe,die:Bt,play:(name,opts)=>y.play(name,opts),footstep:qt,changeState:J,consumeBufferedJump:_t})}'),
 ].join('\n');
 
 await rm(output, { recursive: true, force: true });
@@ -181,7 +191,7 @@ const report = {
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');

@@ -25,7 +25,8 @@ This plan separates what can be improved **in the published-artifact repository 
 - [x] Integrate chapter, save, scroll and the collision-world factory (spatial queries, raycasts, capsule sweeps, moving bodies) into a guarded, isolated development build, with differential tests.
 - [x] Reconstruct and integrate bounded player input, gait, jump/fall, low-mantle, ledge grab, hang, shimmy and climb transitions with differential tests.
 - [x] Integrate authored leap targeting, flight interpolation, interruption and landing into the source-backed development player, retaining differential parity checks.
-- [ ] Recover the remaining player motion solver, combat, game state, HUD, audio, rendering and scene/engine dependencies with independent parity checks.
+- [x] Integrate grounded collision sweeps, airborne gravity/steering/ledge checks, and landing resolution into readable player-motion source with differential tests.
+- [ ] Recover the remaining high-level locomotion/animation state machine, combat, game state, HUD, audio, rendering and scene/engine dependencies with independent parity checks.
 - [ ] Resolve the published game's headless `CHAPTER_CARD` transition diagnostic and establish an authoritative gameplay/browser test baseline.
 - [ ] Replace the transitional chunk adapter with an explicit, versioned, reproducible source build only after application dependency and parity gates pass.
 
