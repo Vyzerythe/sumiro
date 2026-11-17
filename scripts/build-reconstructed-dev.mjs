@@ -110,9 +110,10 @@ const jumpFunction = /function at\(\)\{[\s\S]*?\}(?=function ot\()/;
 const fallFunction = /function it\(e=0\)\{[\s\S]*?\}(?=function at\()/;
 const ledgeGrabBlock = /function St\(e,t\)\{[\s\S]*?\}(?=function Tt\()/;
 const ledgeHangBlock = /function kt\(e\)\{[\s\S]*?\}(?=function Mt\()/;
+const lowMantleBlock = /function pt\(e=1\)\{[\s\S]*?\}(?=function _t\(\))/;
 const headingFunction = /function U\(e,t\)\{[\s\S]*?\}(?=var Me=)/;
 const timelineFunctions = /function Ve\(e\)\{[\s\S]*?\}(?=var Ge=)/;
-if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText) || !steeringFunction.test(playerText) || !gaitFunction.test(playerText) || !directionFunction.test(playerText) || !jumpFunction.test(playerText) || !fallFunction.test(playerText) || !ledgeGrabBlock.test(playerText) || !ledgeHangBlock.test(playerText)) {
+if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText) || !ledgeFactory.test(playerText) || !steeringFunction.test(playerText) || !gaitFunction.test(playerText) || !directionFunction.test(playerText) || !jumpFunction.test(playerText) || !fallFunction.test(playerText) || !ledgeGrabBlock.test(playerText) || !ledgeHangBlock.test(playerText) || !lowMantleBlock.test(playerText)) {
   throw Error('Player cinematic timing boundary changed: re-audit');
 }
 const playerRewritten = [
@@ -123,6 +124,7 @@ const playerRewritten = [
   "import { movementConfig as O } from '../../src/player/movement-config.mjs';",
   "import { alignToLedge, beginLedgeGrab, detectLedgeGrab } from '../../src/player/ledge-grab.mjs';",
   "import { shimmyAlongLedge, updateLedgeHang, completeLedgeClimb } from '../../src/player/ledge-controller.mjs';",
+  "import { probeLowMantle, probeWallMantle, beginLowMantle, updateLowMantle } from '../../src/player/mantle.mjs';",
   playerText.replace(playerConfig, 'var k=O,ee=24').replace(headingFunction, '').replace(timelineFunctions, '').replace(ledgeFactory, '')
     .replace(steeringFunction,
       'function Le(e){updateInputSteering(q,m,p.get(`camera_rig.rail`),sn.script,e,k.buffer,me)}')
@@ -139,6 +141,12 @@ const playerRewritten = [
       'function kt(e){updateLedgeHang(q,m,e,ye,{drop:Dt,align:Ct,leapBack:Et,leapSide:Tt,climbOrLeap:Ot,shimmy:At,changeState:J})}',
       'function At(e,t){shimmyAlongLedge(q,t,e,p.get(`camera_rig.rail`)?.railYaw??0,k.shimmyRate,Ct,J)}',
       'function jt(){completeLedgeClimb(q,K,y,v,{forwardOffset:N,heightGain:M,surface:Y},J)}',
+    ].join(''))
+    .replace(lowMantleBlock, [
+      'function pt(e=1){return probeLowMantle(q,v,e)}',
+      'function mt(){return probeWallMantle(q,E,v,ht)}',
+      'function ht(e){beginLowMantle(q,e,F,(clip,options)=>y.play(clip,options),J)}',
+      'function gt(){updateLowMantle(q,y,v,P,M,Y,J,it)}',
     ].join('')),
 ].join('\n');
 
@@ -162,7 +170,7 @@ const report = {
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');

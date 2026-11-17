@@ -23,7 +23,8 @@ This plan separates what can be improved **in the published-artifact repository 
 ## P1.5 — progressive engine reconstruction
 
 - [x] Integrate chapter, save, scroll and the collision-world factory (spatial queries, raycasts, capsule sweeps, moving bodies) into a guarded, isolated development build, with differential tests.
-- [ ] Reconstruct player motion, game state, HUD, audio, rendering, and remaining scene/engine dependencies with independent parity checks.
+- [x] Reconstruct and integrate bounded player input, gait, jump/fall, low-mantle, ledge grab, hang, shimmy and climb transitions with differential tests.
+- [ ] Recover the remaining player motion solver, full climbing/leap system, game state, HUD, audio, rendering, and scene/engine dependencies with independent parity checks.
 - [ ] Resolve the published game's headless `CHAPTER_CARD` transition diagnostic and establish an authoritative gameplay/browser test baseline.
 - [ ] Replace the transitional chunk adapter with an explicit, versioned, reproducible source build only after application dependency and parity gates pass.
 

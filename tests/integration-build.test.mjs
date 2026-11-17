@@ -48,6 +48,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputPlayer, /src\/player\/movement-config\.mjs/);
     assert.match(outputPlayer, /src\/player\/ledge-grab\.mjs/);
     assert.match(outputPlayer, /src\/player\/ledge-controller\.mjs/);
+    assert.match(outputPlayer, /src\/player\/mantle\.mjs/);
+    assert.match(outputPlayer, /function pt\(e=1\)\{return probeLowMantle/);
+    assert.match(outputPlayer, /function mt\(\)\{return probeWallMantle/);
+    assert.match(outputPlayer, /function ht\(e\)\{beginLowMantle/);
+    assert.match(outputPlayer, /function gt\(\)\{updateLowMantle/);
     assert.match(outputPlayer, /function St\(e,t\)\{beginLedgeGrab/);
     assert.match(outputPlayer, /function kt\(e\)\{updateLedgeHang/);
     assert.match(outputPlayer, /function jt\(\)\{completeLedgeClimb/);
@@ -98,6 +103,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.equal(typeof grab.detectLedgeGrab, 'function');
     const controller = await import(pathToFileURL(join(out,'src/player/ledge-controller.mjs')).href);
     assert.equal(typeof controller.completeLedgeClimb, 'function');
+    const mantle = await import(pathToFileURL(join(out,'src/player/mantle.mjs')).href);
+    assert.equal(typeof mantle.probeLowMantle, 'function');
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {

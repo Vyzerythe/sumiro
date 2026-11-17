@@ -109,3 +109,7 @@ The required sandbox Chromium regression now runs `node scripts/browser-smoke.mj
 ### Ledge grab, hang, shimmy and climb controller
 
 The development build now replaces the original bundled `St`/`Ct`/`wt` ledge-grab and `kt`/`At`/`jt` hanging-climb code with delegation into `src/player/ledge-grab.mjs` and `src/player/ledge-controller.mjs`. The original callback environment (animation, state transitions, level-world lookups, camera rail and leap/drop helpers) remains wired from the player runtime. Differential tests `tests/player-ledge-grab-parity.test.mjs` and `tests/player-ledge-controller-parity.test.mjs` verify detection order, body enablement, movement-state initialization, input priorities, shimmy direction, and climb completion. Mantle animation and generic leap selection remain compiled pending separate tested integration.
+
+### Source-backed low-mantle subsystem
+
+The copied player runtime now delegates low-ledge probing, collision-normal mantle detection, mantle initiation, and clip-driven mantle completion to `src/player/mantle.mjs`. The original callbacks for animation, world queries, state changes, and falling are retained. Differential tests check query bounds, ground obstruction, carrier handling, animation progress, and the fallback when no landing surface is found. This complements the recovered ledge grab, hang, shimmy, and full climb transition, but does not yet recover the complete motion solver, player skeletal animation, scene routing, or combat.
