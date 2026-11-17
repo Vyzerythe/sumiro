@@ -30,6 +30,8 @@ jobs:
         run: node --test tests/chapter-parity.test.mjs
       - name: Verify reconstructed saves against the published implementation
         run: node --test tests/save-parity.test.mjs
+      - name: Verify source-backed development build
+        run: node --test tests/integration-build.test.mjs
       - name: Generate read-only module inventory
         run: |
           node scripts/inventory-bundle.mjs > bundle-inventory.json
