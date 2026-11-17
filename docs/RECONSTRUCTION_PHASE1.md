@@ -12,7 +12,7 @@ The reconstructed registry carries all six chapter records, lookup behavior, abi
 
 ## Why this is safe
 
-1. The new source is **not wired into the shipped game**. The original artifact remains byte-identical.
+1. The new source **is wired into the isolated source-backed development copy**, while the published `sumiro/` directory remains byte-identical.
 2. The test imports the published module and the reconstruction side by side, comparing actual metadata and calls across valid and unknown chapter identifiers.
 3. Run mutation and reference identity are checked explicitly.
 4. Legacy quirks, including clearing `shrine` but retaining `abilities` when changing to an unknown chapter, are preserved rather than silently improved.
@@ -30,11 +30,12 @@ Node.js 22 or newer is recommended, consistent with the repository CI.
 
 This proves only the tested chapter-domain behavior. It is **not** proof of a full source build, license clearance, save compatibility, or browser gameplay parity. The original source comments and authoring layout cannot be retrieved verbatim from this bundle.
 
-## Next migration slices
+## Subsequent reconstructed slices
 
-- Identify and reconstruct the save-data defaults, normalization and migration functions from `bundle/game-B5zfa1fm.js`, with edge-case fixtures.
-- Trace integration boundaries for game state, chapter transitions, and UI.
-- Reconstruct pure functionality before scene or renderer subsystems.
-- Introduce a reproducible source entry/build only after enough upstream dependencies have been mapped and browser behavior has a dependable regression suite.
+- Save-data defaults, migration and storage compatibility: implemented under `src/domain/save.mjs`.
+- Scroll catalog and assignments: implemented under `src/domain/scrolls.mjs`.
+- Collision polygon/wall geometry and moving-body transforms: implemented under `src/physics/`.
+- **Remaining:** game-state and UI contracts, collision-world spatial queries, player/scene/render/audio subsystems, and complete gameplay regression automation.
+- A full reproducible source-only build is **not** available; the current adapter-based development build is an intermediate step.
 
 **Deployment gate:** Never replace `sumiro/bundle/` until a reconstructed build passes artifact integrity and representative browser/playthrough comparisons, including save migration and chapter progression.

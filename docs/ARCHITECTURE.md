@@ -2,7 +2,7 @@
 
 ## What is actually versioned here
 
-The default branch currently contains a **static web distribution** rooted at `sumiro/`, plus `.nojekyll` at repository root. `sumiro/index.html` loads a hashed JavaScript entry module from `sumiro/bundle/` using relative paths. Compiled code contains the game's six-chapter progression and a browser-local save key (`sumiro.save.v1`).
+The default branch `main` remains the **static published distribution** rooted at `sumiro/`. The reconstruction working branch adds readable, selectively recovered modules under `src/` and tooling under `scripts/` while retaining the same published game bytes. `sumiro/index.html` loads a hashed JavaScript entry module from `sumiro/bundle/` using relative paths. Compiled code contains the game's six-chapter progression and a browser-local save key (`sumiro.save.v1`).
 
 ````text
 .
@@ -11,19 +11,20 @@ The default branch currently contains a **static web distribution** rooted at `s
 │   ├── index.html
 │   ├── bundle/        # generated JS and Draco/WebAssembly runtime files
 │   └── assets/        # 3D models, textures, audio, and JSON data
-├── tests/             # static-distribution checks
+├── src/               # selected reconstructed domain/physics modules
+├── scripts/           # immutable-output dev assembly and bundle inventory
+├── tests/             # artifact, parity and integration checks
 ├── docs/              # maintainer documentation
 └── .github/           # CI and contribution templates
 ````
 
 The `assets/` hierarchy groups media by purpose (for example `audio/`, `backdrop/`, `player/`, and environment and chapter assets). `assets/audio/index.json` provides an audio index; neighboring manifests retain additional audio metadata.
 
-## What is not present
+## What is available versus still missing
 
-- Editable source modules or a canonical application architecture document from the originating source project.
-- A package manifest, lockfile, and documented version of the build toolchain.
-- A verifiable build-from-source command or source maps.
-- Source-level tests, browser automation, or published gameplay/performance benchmarks.
+- **Available on the reconstruction branch:** readable chapter/save/scroll code, collision geometry and moving-body code; executable parity comparisons with the compiled implementation; isolated development-build assembly; title-screen Chromium smoke coverage.
+- **Still missing:** the original, complete editable game source, its canonical source architecture and historical authoring files, dependency/lockfile-based application build toolchain, and a **fully source-compiled** production build.
+- **Still unverified:** representative gameplay, save/reload and chapter progression in the source-backed runtime; full browser/device compatibility; asset ownership, licenses and reproducible production output.
 
 The release commit on `main` is labeled `Publish Sumiro build from sumiro@ccba6cf`. That string is **provenance information, not a reproducible-source link**: the referenced source tree and its workflow are not available in this repository.
 
@@ -33,9 +34,9 @@ The release commit on `main` is labeled `Publish Sumiro build from sumiro@ccba6c
 2. Keep `sumiro/index.html` and the `sumiro/` URL prefix consistent with relative module and asset paths.
 3. Treat binary media as shipped artifacts. Preserve names and directory layout unless the consuming code and manifests are rebuilt together.
 4. Preserve save compatibility when source work eventually resumes; existing saves are browser-local and may depend on keys and schema in the bundled code.
-5. Keep quality checks honest: the CI check catches missing files and bad JSON, but it does not certify runtime behavior.
+5. Keep quality checks honest: CI catches static integrity failures and compares selected domain behaviors; Chromium verifies boot/title availability, **not** complete gameplay parity.
 
-## Future source integration
+## Reconstruction boundary
 
-When the editable project is available, evaluate either a separate source repository with an automated publication pipeline to this repository, **or** a source-and-distribution layout in one repository. Choose based on actual build requirements, ownership, deployment settings, and history. Do not pre-create a speculative `src/` tree.
+The recovered `src/` hierarchy is intentionally incremental: domain modules and selected physics operations use unambiguous public interfaces and are compared against the compiled reference. The development builder copies the artifact to an ignored scratch directory and rewires only pinned, audited chunk boundaries. This is **a transitional compatibility bridge**, not a finished authoring toolchain. Future production architecture must be selected after core engine modules, dependency ownership and browser-level gameplay gates are understood.
 

@@ -14,9 +14,18 @@ This plan separates what can be improved **in the published-artifact repository 
 - [x] Document the published build's current structure and operational boundaries.
 - [x] Add a zero-install static-distribution integrity check and CI job.
 - [x] Establish contribution, vulnerability-reporting, and release guidance.
-- [ ] Once source is available, add source-level type/lint/unit checks and lockfile-based dependency/security review.
-- [ ] Add browser-level automation for boot, core input, save compatibility, representative chapter flows, and visual/performance regressions.
+- [x] Add differential tests for reconstructed chapter, save, scroll and initial collision physics behavior.
+- [ ] Recover the complete source and add source-level type/lint coverage and lockfile-based dependency/security review.
+- [x] Add browser-level automation for reference/development boot and title-menu comparison.
+- [ ] Extend browser automation to reliable core input, save compatibility, representative chapter flows, and visual/performance regressions.
 - [ ] Enable appropriate branch protections and required checks in GitHub repository settings.
+
+## P1.5 — progressive engine reconstruction
+
+- [x] Integrate chapter, save, scroll and selected collision physics source into a guarded, isolated development build.
+- [ ] Reconstruct the remaining collision world (capsule sweeps, raycasts, spatial indexing), player motion, game state, HUD, audio, and rendering from evidence, with differential tests.
+- [ ] Resolve the published game's headless `CHAPTER_CARD` transition diagnostic and establish an authoritative gameplay/browser test baseline.
+- [ ] Replace the transitional chunk adapter with an explicit, versioned, reproducible source build only after application dependency and parity gates pass.
 
 ## P2 — release maturity
 

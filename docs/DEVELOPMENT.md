@@ -16,11 +16,16 @@ python3 -m http.server 8000
 
 Then visit `http://localhost:8000/sumiro/` (not `/`).
 
-## Distribution checks
+## Distribution and reconstructed-source checks
 
 ```sh
-node --test tests/static-build.test.mjs
+node --test tests/*.test.mjs
+node scripts/build-reconstructed-dev.mjs
+python3 -m http.server 8000 --directory .local-build
+# Open http://localhost:8000/sumiro/
 ```
+
+The development builder never edits published assets. Its output is isolated and ignored by Git. It rejects unsafe output paths and refuses to rewrite chunks when pinned reference hashes have changed.
 
 The tests ensure that:
 
@@ -29,13 +34,15 @@ The tests ensure that:
 - checked-in JSON configuration files have valid syntax;
 - files identified by the audio index and audio manifests actually exist.
 
-**Not tested:** successful page boot, 3D rendering, asset decoding, gameplay progression, audio output, controls, browser compatibility, or rebuild reproducibility. Run the [manual release checks](RELEASE_CHECKLIST.md) for those areas.
+**Additional test coverage:** chapter progression functions, save migration and storage behavior, collectible scroll data, collision geometry, and moving-body transforms are tested against the published compiled implementation. CI separately boots both builds in Chromium and verifies a visible title menu with no uncaught JS/network failures.
+
+**Not yet verified:** gameplay progression beyond the title, audio output, realistic rendering, complete source-build reproducibility and cross-browser support. The opt-in New Game interaction probe is currently inconclusive on the *published reference* under headless software rendering. See [the development-build guide](SOURCE_BACKED_DEV_BUILD.md) and [manual release checks](RELEASE_CHECKLIST.md).
 
 ## Making changes safely
 
-Documentation or validation changes can be made here directly by pull request. Avoid editing hashed bundle chunks: changes will be overwritten by the next published build and may break the module graph. If a game behavior change is required, first locate the source project, establish a documented build, and include generated artifacts and provenance together as one auditable release.
+Documentation or validation changes can be made here directly by pull request. Avoid editing hashed bundle chunks: changes will be overwritten by the next published build and may break the module graph. For behavior changes, update recovered source only after determining the relevant compatibility contract, and do not promote the development copy to production without completed gameplay regression checks and provenance.
 
-## What not to bootstrap yet
+## Toolchain policy
 
-Do not add a placeholder `package.json`, guessed build commands, copied framework configuration, or empty source directories solely to resemble a typical JavaScript repository. The proper toolchain must be recovered from the originating project.
+No authoritative upstream package manifest or lockfile has been recovered. The current reconstruction uses built-in Node test facilities; Playwright is installed transiently only in the browser CI job. Do not add guessed runtime dependencies, a placeholder production package manifest, or a speculative bundler configuration before the actual source/build requirements are established.
 

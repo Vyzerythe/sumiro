@@ -1,8 +1,8 @@
 # Sumiro
 
-Sumiro is a browser-based, 3D interactive game presented as six chapters. This repository currently publishes **a built web distribution**, not the editable development source.
+Sumiro is a browser-based 3D game spanning six chapters. **The production game in `sumiro/` is a compiled distribution.** The `work/source-reconstruction` branch contains an incremental, independently tested **reconstruction** of selected source modules, but not the original, complete upstream source project.
 
-> **Repository status:** The shipped game is under `sumiro/`. The checked-in JavaScript files are bundled, hashed outputs. No source project, dependency lockfile, build command, or source-level test suite is included here. Do not assume that changing a compiled chunk is an enduring development workflow.
+> **Development status:** This branch can build a separate source-backed development copy using readable chapter, save, scroll and collision-physics helpers. Most game systems are still compiled artifacts. The original authoring project, source-build toolchain, and complete gameplay parity are **not** recovered or verified. Nothing under the published `sumiro/` directory is modified.
 
 ## Run the published build locally
 
@@ -19,6 +19,10 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 | `sumiro/index.html` | Game entry point and loading screen |
 | `sumiro/bundle/` | Generated, content-hashed JavaScript and WASM runtime assets |
 | `sumiro/assets/` | Game models, textures, audio, and JSON asset data |
+| `src/domain/` | Reconstructed chapter, save, and scroll game logic |
+| `src/physics/` | Reconstructed collision geometry and moving-body logic |
+| `scripts/build-reconstructed-dev.mjs` | Guarded, isolated source-backed development build |
+| `scripts/browser-smoke.mjs` | Chromium boot/title comparison against the published game |
 | `.nojekyll` | Bypasses Jekyll processing on compatible static hosting |
 | `tests/` | Distribution-level integrity tests, not gameplay tests |
 | `.github/workflows/` | Automated repository validation |
@@ -28,13 +32,16 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 
 ## Validate changes
 
-Run `node --test tests/static-build.test.mjs` with Node.js 22 or later. The check validates the distributable entry point, local JavaScript imports, JSON syntax, and referenced audio assets. It does **not** build the game, simulate gameplay, or prove rendering and audio work in browsers. See [release checks](docs/RELEASE_CHECKLIST.md) for manual testing.
+With Node.js 22 or newer, run `node --test tests/*.test.mjs` for distribution integrity, differential source parity and development-build integration tests. For a source-backed development distribution, run `node scripts/build-reconstructed-dev.mjs`, then serve `.local-build/` over HTTP and visit `/sumiro/`. The build is **not** a full source compilation and must not be deployed in place of the published game.
+
+GitHub Actions also runs a Chromium comparison of the published and development builds through the title screen. It does **not** prove gameplay/save-reload parity; the New Game transition test remains a documented opt-in diagnostic. See [source-backed build and test limitations](docs/SOURCE_BACKED_DEV_BUILD.md) and [release checks](docs/RELEASE_CHECKLIST.md).
 
 For a reproducible inventory of the generated JS module graph, run `node scripts/inventory-bundle.mjs > bundle-inventory.json`; the output is a local, read-only report, not recovered source.
 
 ## Documentation
 
 - [Architecture and repository boundaries](docs/ARCHITECTURE.md)
+- [Source-backed development build](docs/SOURCE_BACKED_DEV_BUILD.md)
 - [Development and validation](docs/DEVELOPMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Asset provenance and licensing](docs/ASSET_PROVENANCE.md)
