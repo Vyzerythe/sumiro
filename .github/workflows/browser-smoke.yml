@@ -15,7 +15,7 @@ jobs:
   chromium:
     name: Published vs source-backed boot
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -30,4 +30,4 @@ jobs:
       - name: Boot both builds and compare failures
         run: node scripts/browser-smoke.mjs
       - name: Verify sandbox gameplay movement in both builds
-        run: node scripts/browser-smoke.mjs --play
+        run: node scripts/browser-smoke.mjs --play --jump

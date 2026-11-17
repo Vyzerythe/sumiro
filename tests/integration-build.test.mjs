@@ -45,6 +45,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputPlayer, /src\/player\/ledge-path\.mjs/);
     assert.match(outputPlayer, /src\/player\/input-steering\.mjs/);
     assert.match(outputPlayer, /src\/player\/locomotion\.mjs/);
+    assert.match(outputPlayer, /src\/player\/movement-config\.mjs/);
+    assert.doesNotMatch(outputPlayer, /var O=\{/);
     assert.match(outputPlayer, /function at\(\)\{beginJump/);
     assert.match(outputPlayer, /function it\(e=0\)\{beginFall/);
     assert.match(outputPlayer, /function Qe\(\)\{classifyGroundGait/);
@@ -85,6 +87,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     const movement = {vx:0,vz:0,state:'IDLE',stateT:1};
     locomotion.classifyGroundGait(movement);
     assert.equal(movement.state,'IDLE');
+    const movementConfig = await import(pathToFileURL(join(out,'src/player/movement-config.mjs')).href);
+    assert.equal(movementConfig.movementConfig.gravity,24);
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {

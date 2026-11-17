@@ -79,6 +79,7 @@ const servers = [];
 const interaction = process.argv.includes('--interaction');
 const sandbox = process.argv.includes('--play');
 if (interaction && sandbox) throw Error('--play and --interaction are mutually exclusive');
+if (process.argv.includes('--jump') && !sandbox) throw Error('--jump requires --play');
 let browser;
 async function observe(label, port) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -139,6 +140,57 @@ async function observe(label, port) {
           movementSummary.simulatedSeconds <= .10 || movementSummary.game !== 'PLAY') {
         throw Error('Sandbox locomotion did not produce valid forward movement');
       }
+      if (process.argv.includes('--jump')) {
+        // A separate frame-sampled trace avoids missing short transient states
+        // under slow software-rendered WebGL.
+        await page.waitForFunction(() => window.__game?.read?.()?.grounded === true, null,
+          {timeout:60000});
+        const jumpStart = await page.evaluate(() => window.__game.read());
+        await page.evaluate(() => {
+          window.__jumpTrace = [];
+          let frames = 0;
+          const capture = () => {
+            const now = window.__game?.read?.();
+            if (now) window.__jumpTrace.push({
+              state: now.state, y: now.y, grounded: now.grounded, t: now.t,
+            });
+            if (++frames < 1500) requestAnimationFrame(capture);
+          };
+          requestAnimationFrame(capture);
+        });
+        console.log(label + ': pressing Space to verify jump impulse');
+        await page.keyboard.down('Space');
+        try {
+          await page.waitForFunction(initial =>
+            window.__jumpTrace?.some(sample =>
+              sample.state === 'JUMP' && sample.y > initial.y + .05),
+          {y:jumpStart.y}, {timeout:90000});
+        } finally {
+          await page.keyboard.up('Space');
+        }
+        console.log(label + ': upward jump confirmed; awaiting ground contact');
+        await page.waitForFunction(initial => {
+          const now = window.__game?.read?.();
+          return !!now && now.game === 'PLAY' && now.grounded &&
+            now.t > initial.t + .40;
+        }, {t:jumpStart.t}, {timeout:140000});
+        const landed = await page.evaluate(() => window.__game.read());
+        const trace = await page.evaluate(() => window.__jumpTrace ?? []);
+        const peakHeight = Math.max(...trace.map(sample => sample.y));
+        movementSummary.jump = {
+          upwardMotion: peakHeight - jumpStart.y,
+          landed: landed.grounded,
+          finite: [landed.x, landed.y, landed.z, landed.t, peakHeight].every(Number.isFinite),
+          game: landed.game,
+          level: landed.level,
+        };
+        if (!movementSummary.jump.landed || !movementSummary.jump.finite ||
+            movementSummary.jump.upwardMotion < .05 ||
+            movementSummary.jump.game !== 'PLAY') {
+          throw Error('Sandbox jump failed to return to valid gameplay/ground state');
+        }
+      }
+
     } else {
       console.log(label + ': boot overlay removed; checking title menu');
       await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 15000 });
@@ -185,6 +237,7 @@ async function observe(label, port) {
     console.error(label + ': FAILED: ' + error.message);
     console.error(label + ': errors=' + JSON.stringify(errors));
     console.error(label + ': missing=' + JSON.stringify(missing));
+    if (sandbox) console.error(label + ': recent jump samples=' + JSON.stringify(await page.evaluate(() => window.__jumpTrace?.slice(-12) ?? []).catch(() => [])));
     console.error(label + ': diagnostic=' + JSON.stringify(await page.evaluate(() => ({
       title: document.title,
       engineExists: !!window.__engine,
@@ -217,7 +270,10 @@ try {
     if (!original.movementSummary || !candidate.movementSummary ||
         original.movementSummary.level !== candidate.movementSummary.level ||
         original.movementSummary.game !== candidate.movementSummary.game ||
-        !original.movementSummary.finite || !candidate.movementSummary.finite) {
+        !original.movementSummary.finite || !candidate.movementSummary.finite ||
+        (process.argv.includes('--jump') &&
+          (!original.movementSummary.jump?.landed || !candidate.movementSummary.jump?.landed ||
+           original.movementSummary.jump.level !== candidate.movementSummary.jump.level))) {
       throw Error('Published and source-backed PLAY state or movement baseline differ');
     }
   }
@@ -227,7 +283,9 @@ try {
     throw Error('New-game saved state differs between original and source-backed builds');
   }
   process.stdout.write(sandbox
-    ? 'Both builds entered sandbox PLAY and demonstrated keyboard locomotion with finite player states.\n'
+    ? (process.argv.includes('--jump')
+        ? 'Both builds entered PLAY, moved and completed a jump/ground contact with finite player states.\n'
+        : 'Both builds entered sandbox PLAY and demonstrated keyboard locomotion with finite player states.\n')
     : interaction ? 'Both builds booted, entered PLAY, and persisted matching saves.\n'
     : 'Both builds completed boot to the title menu without errors.\n');
 } finally {

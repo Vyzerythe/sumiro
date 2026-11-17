@@ -99,3 +99,9 @@ The published game's own `?play=1` URL mode bypasses the title-card transition a
 ### Gait, jump, and fall transitions
 
 The source-backed development player now calls `src/player/locomotion.mjs` for grounded gait classification, movement-facing fallback, initial jump impulses, and fall transitions. The original player module continues to own its action state machine and passes its existing animation, footstep, carrier-detachment and state-change hooks into the reconstructed functions. `tests/player-locomotion-parity.test.mjs` evaluates both implementations against the published player function bodies using boundary-speed and seeded event/state fixtures. This is a bounded recovery of movement transitions, **not** a complete replacement of acceleration, gravity integration, landing, or climbing.
+
+### Recovery: player movement tuning and jump browser regression
+
+`src/player/movement-config.mjs` now holds the published movement speed, acceleration, gravity, jump, dash and capsule parameters and is imported by the **copied** player bundle. Its complete object structure and insertion order are checked against the immutable compiled reference in `tests/player-movement-config-parity.test.mjs`.
+
+The required sandbox Chromium regression now runs `node scripts/browser-smoke.mjs --play --jump`. After the already verified W-key movement, it presses Space and records frame-sampled player debug states, requiring an upward `JUMP` and subsequent grounded `PLAY` state in **both** published and source-backed builds, without imposing frame-count or speed equality on headless software rendering. This extends coverage to a bounded real movement and landing scenario; climbing/combat/save progression are still not certified.

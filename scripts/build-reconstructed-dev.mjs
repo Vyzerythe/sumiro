@@ -98,6 +98,10 @@ const collisionRewritten = "import { extrudeWallPolyline as a, pointInPolygon as
   + collisionWithoutGeometryOrBody.replace(originalWorldFactory, '');
 
 const playerText = player.toString('utf8');
+const playerConfig = /var O=\{[\s\S]*?\},k=O,ee=24/;
+if (!playerConfig.test(playerText) || playerText.match(/\bk=O,ee=24/g)?.length !== 1) {
+  throw Error('Movement configuration boundary changed: re-audit');
+}
 const ledgeFactory = /function Ae\(e\)\{[\s\S]*?\}(?=function je\()/;
 const steeringFunction = /function Le\(e\)\{[\s\S]*?\}(?=function Re\(\)\{)/;
 const gaitFunction = /function Qe\(\)\{[\s\S]*?\}(?=function \$e\()/;
@@ -114,7 +118,8 @@ const playerRewritten = [
   "import { createLedgePath as Ae } from '../../src/player/ledge-path.mjs';",
   "import { updateInputSteering } from '../../src/player/input-steering.mjs';",
   "import { classifyGroundGait, selectTravelDirection, beginJump, beginFall } from '../../src/player/locomotion.mjs';",
-  playerText.replace(headingFunction, '').replace(timelineFunctions, '').replace(ledgeFactory, '')
+  "import { movementConfig as O } from '../../src/player/movement-config.mjs';",
+  playerText.replace(playerConfig, 'var k=O,ee=24').replace(headingFunction, '').replace(timelineFunctions, '').replace(ledgeFactory, '')
     .replace(steeringFunction,
       'function Le(e){updateInputSteering(q,m,p.get(`camera_rig.rail`),sn.script,e,k.buffer,me)}')
     .replace(gaitFunction,'function Qe(){classifyGroundGait(q)}')
@@ -143,7 +148,7 @@ const report = {
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');
