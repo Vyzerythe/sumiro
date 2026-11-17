@@ -1,0 +1,31 @@
+name: Browser regression
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    name: Published vs source-backed boot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned browser driver
+        run: npm install --no-save --package-lock=false playwright@1.65.1
+      - name: Install Chromium with system dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Boot both builds and compare failures
+        run: node scripts/browser-smoke.mjs
