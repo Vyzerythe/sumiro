@@ -31,6 +31,22 @@ node --test tests/*.test.mjs
 
 The integration test builds the copied tree, confirms the original file contents did not change, verifies the new adapter can import the readable chapter module, and checks that save references are redirected. CI runs this test.
 
+## Automated browser smoke gate
+
+The standalone [`scripts/browser-smoke.mjs`](../scripts/browser-smoke.mjs) runs in Chromium using Playwright. CI installs a pinned Playwright version (1.65.1) and its Chromium browser in a separate `Browser regression` workflow. To run it locally:
+
+```sh
+npm install --no-save --package-lock=false playwright@1.65.1
+npx playwright install chromium
+node scripts/browser-smoke.mjs
+```
+
+The script builds `.local-build-browser/` (ignored by Git), starts separate local HTTP servers for the original repository and the development copy, launches isolated browser contexts, waits for a nonzero-size canvas, and records uncaught errors and failed network requests. It fails if the **published reference** cannot boot: a broken reference cannot establish parity. It then applies the same conditions to the development copy.
+
+This gate only asserts basic browser boot and resource loading. It does **not** prove that the game reaches the title menu, that the GPU renders the intended scene, or that gameplay, audio, save reload and chapter transitions are equivalent. Those require additional deterministic UI/playthrough probes.
+
+The browser test's package installation is transient to avoid presenting Playwright as a dependency of the distributed game. Before a permanent automation stack is adopted, use a checked-in dependency manifest and lockfile for the developer/test toolchain.
+
 ## Limits and safety gates
 
 - The other JavaScript chunks, third-party library code, WASM, models, textures, and audio are **still compiled distribution artifacts**.
