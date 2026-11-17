@@ -50,6 +50,8 @@ jobs:
         run: node --test tests/player-ledge-grab-parity.test.mjs
       - name: Verify hanging, shimmy and climb transitions
         run: node --test tests/player-ledge-controller-parity.test.mjs
+      - name: Verify low mantle probes, entry and completion
+        run: node --test tests/player-mantle-parity.test.mjs
       - name: Verify reconstructed saves against the published implementation
         run: node --test tests/save-parity.test.mjs
       - name: Verify source-backed development build
