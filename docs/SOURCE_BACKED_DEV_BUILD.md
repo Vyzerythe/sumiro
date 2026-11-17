@@ -39,11 +39,15 @@ The standalone [`scripts/browser-smoke.mjs`](../scripts/browser-smoke.mjs) runs 
 npm install --no-save --package-lock=false playwright@1.65.1
 npx playwright install chromium
 node scripts/browser-smoke.mjs
+# Optional diagnostic only (not yet a required CI gate):
+node scripts/browser-smoke.mjs --interaction
 ```
 
-The script builds `.local-build-browser/` (ignored by Git), starts separate local HTTP servers for the original repository and the development copy, launches isolated browser contexts, waits for a nonzero-size canvas, and records uncaught errors and failed network requests. It fails if the **published reference** cannot boot: a broken reference cannot establish parity. It then applies the same conditions to the development copy.
+The script builds `.local-build-browser/` (ignored by Git), starts separate local HTTP servers for the original repository and the development copy, launches isolated browser contexts, waits for a nonzero-size canvas, for the loading overlay to disappear, and for the title menu to appear; it also records uncaught errors and failed network requests. It fails if the **published reference** cannot boot: a broken reference cannot establish parity. It then applies the same conditions to the development copy.
 
-This gate only asserts basic browser boot and resource loading. It does **not** prove that the game reaches the title menu, that the GPU renders the intended scene, or that gameplay, audio, save reload and chapter transitions are equivalent. Those require additional deterministic UI/playthrough probes.
+The required gate asserts browser boot, title-menu readiness and resource loading. It does **not** prove that the GPU renders the intended scene or that gameplay, audio, save reload and chapter transitions are equivalent.
+
+**Observed issue (2026-11-16/17):** An opt-in New Game/PLAY/save diagnostic successfully reached the **original published** title menu and clicked New Game, but the original remained in `CHAPTER_CARD` for at least 45 seconds under headless software-rendered Chromium, with no saved game yet. No uncaught JS errors or HTTP failures were reported. The source-backed candidate was not reached in that failed run. This is an **inconclusive browser-environment/transition gate**, not a verified reconstruction regression or evidence of full gameplay parity. Run `node scripts/browser-smoke.mjs --interaction` for that stricter diagnostic; it is intentionally not a required CI check until its baseline behavior is understood. [Diagnostic run](https://github.com/Vyzerythe/sumiro/actions/runs/44013316723). Those require additional deterministic UI/playthrough probes.
 
 The browser test's package installation is transient to avoid presenting Playwright as a dependency of the distributed game. Before a permanent automation stack is adopted, use a checked-in dependency manifest and lockfile for the developer/test toolchain.
 
