@@ -73,7 +73,7 @@ const catalogMatch = kitSource.match(catalogPattern);
 if (!catalogMatch || kitSource.match(/w=Object\.keys\(C\)\.length/g)?.length !== 1) {
   throw Error('Published scroll catalog layout changed; re-audit before integrating');
 }
-const kitRewritten = "import { scrollTexts as C, scrollCount as w, scrollsByChapter as T } from '../../src/domain/scrolls.mjs';\\n"
+const kitRewritten = "import { scrollTexts as C, scrollCount as w, scrollsByChapter as T } from '../../src/domain/scrolls.mjs';\n"
   + kitSource.replace(catalogPattern, 'var E={preset:');
 
 await rm(output, { recursive: true, force: true });
