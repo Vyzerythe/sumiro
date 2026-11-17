@@ -21,6 +21,7 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 | `sumiro/assets/` | Game models, textures, audio, and JSON asset data |
 | `src/domain/` | Reconstructed chapter, save, and scroll game logic |
 | `src/physics/` | Reconstructed collision world, raycasts, capsule sweeps, spatial grid and moving-body logic |
+| `src/player/` | Source-backed player input steering, cinematic timing and ledge-path interpolation (not full locomotion) |
 | `scripts/build-reconstructed-dev.mjs` | Guarded, isolated source-backed development build |
 | `scripts/browser-smoke.mjs` | Chromium boot/title comparison against the published game |
 | `.nojekyll` | Bypasses Jekyll processing on compatible static hosting |

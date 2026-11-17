@@ -87,3 +87,7 @@ This does **not** reconstruct interactive locomotion, climbing, the animation sk
 ### Player ledge-path integration
 
 A second player subsystem is now source-backed: `src/player/ledge-path.mjs` reconstructs the X/Z arc-length sampling of ledge points, normalized outward directions, world-space transformations for attached moving bodies, and the published 0.1-unit nearest-grip lookup. Its differential test covers moving platforms, duplicate points, edge samples, and range restrictions. It does **not** replace the full climbing state machine, physics integration, or animation/IK solver.
+
+### Interactive player steering
+
+The source-backed development player now also calls `src/player/input-steering.mjs` from its live input update function. This covers camera-relative movement direction, analog stick magnitude, scripted movement overrides, zone transition heading locks, gradual yaw correction, and jump buffering. Differential tests compare an extracted original player function against the readable implementation using stateful multi-frame sequences and edge cases. **The full walking/jumping/climbing controller remains compiled.** Title-screen browser parity is a necessary smoke gate, not proof of in-game movement behavior.

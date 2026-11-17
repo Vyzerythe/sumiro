@@ -43,6 +43,8 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputCollision, /src\/physics\/world\.mjs/);
     assert.match(outputPlayer, /src\/player\/cinematic-timeline\.mjs/);
     assert.match(outputPlayer, /src\/player\/ledge-path\.mjs/);
+    assert.match(outputPlayer, /src\/player\/input-steering\.mjs/);
+    assert.match(outputPlayer, /function Le\(e\)\{updateInputSteering/);
     assert.doesNotMatch(outputPlayer, /function Ae\(e\)\{/);
     assert.doesNotMatch(outputPlayer, /function U\(e,t\)\{/);
     assert.doesNotMatch(outputCollision, /function i\(\)\{/);
@@ -69,6 +71,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.equal(timeline.timelineState(205), 'LEAP');
     const ledges = await import(pathToFileURL(join(out,'src/player/ledge-path.mjs')).href);
     assert.equal(ledges.createLedgePath({points:[[0,0,0,1,0],[3,0,4,1,0]]}).length,5);
+    const steering = await import(pathToFileURL(join(out,'src/player/input-steering.mjs')).href);
+    const state = {state:'IDLE',zone:null,holdActive:false,yaw:0,grounded:true,stickX:0,stickZ:0,stickMag:0,stickAngle:0,jumpBuf:0};
+    steering.updateInputSteering(state,{forward:1,strafe:0,jump:true},null,null,1/60,.15,1.6);
+    assert.equal(state.stickZ,-1);
+    assert.equal(state.jumpBuf,.15);
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {
