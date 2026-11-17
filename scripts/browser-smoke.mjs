@@ -95,13 +95,36 @@ async function observe(label, port) {
       return !!(canvas && canvas.width > 0 && canvas.height > 0);
     }, null, { timeout: 90000 }).then(() => true, () => false);
     await page.waitForTimeout(2000);
+    await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 20000 });
+    const titleMenu = await page.locator('#ink-ui .menu.on h1').textContent();
+    if (titleMenu?.trim() !== 'Sumiro') throw Error('Unexpected title screen: ' + titleMenu);
+    await page.locator('#ink-ui .menu.on li').filter({ hasText: /^New Game$/ }).click();
+    await page.waitForFunction(() => {
+      const save = localStorage.getItem('sumiro.save.v1');
+      if (!save) return false;
+      try {
+        const run = JSON.parse(save);
+        return run.v === 1 && run.started === true
+          && run.chapter === 'ch1_climb' && run.unlocked?.includes('ch1_climb');
+      } catch {
+        return false;
+      }
+    }, null, { timeout: 90000 });
+    await page.waitForFunction(() => {
+      return window.__engine?.registry?.get('game.state') === 'PLAY';
+    }, null, { timeout: 90000 });
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sumiro.save.v1')));
+    const saveSummary = {
+      version: saved.v, chapter: saved.chapter, unlocked: saved.unlocked,
+      started: saved.started, music: saved.options?.music,
+    };
     const state = await page.evaluate(() => ({
       title: document.title,
       canvasCount: document.querySelectorAll('canvas').length,
       bootVisible: !!document.querySelector('#boot') &&
         getComputedStyle(document.querySelector('#boot')).display !== 'none',
     }));
-    const result = { label, launched, ...state, errors: errors.slice(0, 12), missing: missing.slice(0, 12) };
+    const result = { label, launched, ...state, titleMenu, saveSummary, errors: errors.slice(0, 12), missing: missing.slice(0, 12) };
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     return result;
   } finally {
@@ -124,7 +147,12 @@ try {
     throw Error('Source-backed build failed browser boot or asset resolution gate');
   }
   if (candidate.title !== original.title) throw Error('Document title mismatch');
-  process.stdout.write('Both builds created a canvas without uncaught JS errors or HTTP failures.\n');
+  if (original.bootVisible || candidate.bootVisible) throw Error('Boot overlay did not disappear');
+  if (original.canvasCount !== candidate.canvasCount) throw Error('Canvas count mismatch');
+  if (JSON.stringify(original.saveSummary) !== JSON.stringify(candidate.saveSummary)) {
+    throw Error('New-game saved state differs between original and source-backed builds');
+  }
+  process.stdout.write('Both builds booted, entered PLAY, persisted matching new-game saves, and loaded without errors.\n');
 } finally {
   await browser?.close();
   await Promise.all(servers.map(({ server }) => new Promise((done) => server.close(done))));
