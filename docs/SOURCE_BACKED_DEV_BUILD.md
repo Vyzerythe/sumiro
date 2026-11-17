@@ -2,7 +2,7 @@
 
 **Status:** An integration experiment, not the final rebuild of Sumiro.
 
-The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter, save and collectible-scroll modules into the actual original game runtime**.
+The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter, save, collectible-scroll and collision-geometry modules into the actual original game runtime**.
 
 ## Build and serve
 
@@ -19,7 +19,8 @@ Open `http://localhost:8000/sumiro/`. Compare with the unmodified published game
 2. Copies `sumiro/` and `src/` into `.local-build/`.
 3. Replaces the **copied** chapter chunk with an ES module adapter mapping the original minified export names to `src/domain/chapters.mjs`.
 4. Replaces the **copied** game save prelude with imports bound to `src/domain/save.mjs`.
-5. Writes a JSON provenance report listing exactly which source modules are used.
+5. Rebinds the copied collision module's wall extrusion and polygon containment exports to readable `src/physics/geometry.mjs`, retaining the compiled collision-world runtime.
+6. Writes a JSON provenance report listing exactly which source modules are used.
 
 Only the **development copy** is modified; tracked artifacts in `sumiro/` are untouched. This does not introduce a package manager or attempt to recompile unrelated generated modules.
 
@@ -64,3 +65,7 @@ The browser test's package installation is transient to avoid presenting Playwri
 Introduce an automated browser smoke test for both original and source-backed builds (boot, menu, new game, save/reload, and chapter flow) and compare observable behavior. Continue subsystem reconstruction only when the integration harness can detect regressions.
 
 **Output safety:** The builder only accepts direct root-level scratch directories named `.local-build` or `.local-build-*`, and rejects other paths before deleting any output. It never writes to `sumiro/`.
+
+## Collision geometry reconstruction
+
+The exported polyline extrusion and polygon-containment routines have executable parity tests against the original generated collision chunk, using representative boundaries, winding order, deterministic seeded polygons, callback order and output identity. The collision-world engine, moving bodies, capsule sweeps, and raycasts remain compiled; only the two independently testable geometry helpers are source-backed at this stage.
