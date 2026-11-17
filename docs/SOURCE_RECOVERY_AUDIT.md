@@ -14,16 +14,24 @@
 | Existing build integrity | Ten JSON files parsed; the central audio index's music, voice, effect and ambience references resolved against the published tree. | These checks protect only a limited part of distribution integrity, not overall game behavior. |
 | Repository CI | GitHub Actions run [44006820190](https://github.com/Vyzerythe/sumiro/actions/runs/44006820190) completed its static integrity job successfully on foundation PR #1. | A useful baseline, but not an original-source build or gameplay test. |
 
-## Public creator and rights context
+## Publisher-mirror discovery and provenance boundary
 
-Public sources identify Shikhar (`@xikhar`) as the creator of the original Sumiro game and describe development with Claude Code, Three.js, Blender, AI-assisted image/model generation, and other tools. This is consistent with the published commit's author account but **does not prove** that the editable source is available or that this repository owner has permission to redistribute or relicense reconstructed derivatives.
+The public repository [xikhar/xikhar.github.io](https://github.com/xikhar/xikhar.github.io) exposes the **same complete Git tree** (SHA `290cd0d4cfd3898ee321ceddffc8df4909ccef48`) as the published `Vyzerythe/sumiro` commit. This is strong evidence of an exact artifact mirror associated with the publisher, **not** proof of an available editable source tree or of any rights grant.
 
-References:
-- [Creator's published game discussion (indexed)](https://www.xitter.cf/xikhar)
-- [Creator workflow summary](https://amusehall.com/games/sumiro/)
-- [Another distribution's project description](https://github.com/1anc6/Sumiro/blob/main/README.md)
+Public repository inspection found `xikhar/beyond-fable` and `xikhar/persona` to contain conventional source project files (`package.json`, source directories, and Vite configuration). They are **different projects** and must not be imported or assumed to share the Sumiro toolchain. No public repository identified in these searches was confirmed to contain editable Sumiro source.
 
-Before substantial reconstruction for public distribution, confirm the original author(s)' licensing/permissions and whether they can supply the source checkout. The repository's public visibility is not a license grant.
+The publishing commit's author is `xikhar`; independently corroborating authorship, asset rights, and the original source maintainer still requires direct evidence. Avoid treating secondary descriptions of creator identities or tools as verified licensing statements.
+
+**Tracking limitation:** GitHub Issues is disabled in `Vyzerythe/sumiro` as of this investigation (attempting to create the source recovery issue returned HTTP 410). Until Issues is explicitly enabled, the task and its acceptance criteria are tracked here and in the roadmap rather than in an issue.
+
+### P0 recovery work item — acceptance criteria
+
+- [ ] Locate the original `sumiro` working repository or a trustworthy backup, or record the exact negative searches performed without claiming the source is irretrievably lost.
+- [ ] Resolve `ccba6cf` and `db75dae` against the **actual originating repo** if accessible, recording owner and full commit IDs.
+- [ ] Collect build scripts, dependency manifests/lockfiles, assets' editable source and production tools, history and rights documentation.
+- [ ] Rebuild in a clean, isolated environment and compare output files and behavior against a pinned published reference.
+- [ ] Document any differences and obtain explicit approval before replacing or altering the current published game.
+- [ ] Update this audit with evidence, precise repository locations, and results; never upload private credentials.
 
 ## Binary/module reconstruction baseline
 
