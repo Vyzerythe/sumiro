@@ -24,6 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check executable browser harness syntax
+        run: node --check scripts/browser-smoke.mjs
       - name: Validate published artifacts
         run: node --test tests/static-build.test.mjs
       - name: Verify reconstructed chapter behavior against published build

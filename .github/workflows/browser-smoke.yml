@@ -31,3 +31,5 @@ jobs:
         run: node scripts/browser-smoke.mjs
       - name: Verify sandbox gameplay movement in both builds
         run: node scripts/browser-smoke.mjs --play --jump
+      - name: Diagnose published authored gap leap and climbing
+        run: node scripts/browser-smoke.mjs --play --gap-leap --reference-only
