@@ -95,3 +95,7 @@ The source-backed development player now also calls `src/player/input-steering.m
 ## Sandbox gameplay regression gate
 
 The published game's own `?play=1` URL mode bypasses the title-card transition and enters a no-save sandbox. The Chromium workflow exercises this mode with `node scripts/browser-smoke.mjs --play`, waits for the public player debug state to report `PLAY`, presses W, and requires finite player telemetry with actual horizontal movement on both the published reference and source-backed development copy. It compares qualitative gameplay contracts instead of imposing identical frame timings on headless software-rendered WebGL. This is a **movement smoke test**, not a complete combat/climbing/visual-equivalence certification. It runs with isolated browser contexts and does not write production player saves.
+
+### Gait, jump, and fall transitions
+
+The source-backed development player now calls `src/player/locomotion.mjs` for grounded gait classification, movement-facing fallback, initial jump impulses, and fall transitions. The original player module continues to own its action state machine and passes its existing animation, footstep, carrier-detachment and state-change hooks into the reconstructed functions. `tests/player-locomotion-parity.test.mjs` evaluates both implementations against the published player function bodies using boundary-speed and seeded event/state fixtures. This is a bounded recovery of movement transitions, **not** a complete replacement of acceleration, gravity integration, landing, or climbing.

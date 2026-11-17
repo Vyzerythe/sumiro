@@ -44,6 +44,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputPlayer, /src\/player\/cinematic-timeline\.mjs/);
     assert.match(outputPlayer, /src\/player\/ledge-path\.mjs/);
     assert.match(outputPlayer, /src\/player\/input-steering\.mjs/);
+    assert.match(outputPlayer, /src\/player\/locomotion\.mjs/);
+    assert.match(outputPlayer, /function at\(\)\{beginJump/);
+    assert.match(outputPlayer, /function it\(e=0\)\{beginFall/);
+    assert.match(outputPlayer, /function Qe\(\)\{classifyGroundGait/);
+    assert.match(outputPlayer, /function ot\(\)\{selectTravelDirection/);
     assert.match(outputPlayer, /function Le\(e\)\{updateInputSteering/);
     assert.doesNotMatch(outputPlayer, /function Ae\(e\)\{/);
     assert.doesNotMatch(outputPlayer, /function U\(e,t\)\{/);
@@ -76,6 +81,10 @@ test('source-backed build preserves originals and binds live domain imports', as
     steering.updateInputSteering(state,{forward:1,strafe:0,jump:true},null,null,1/60,.15,1.6);
     assert.equal(state.stickZ,-1);
     assert.equal(state.jumpBuf,.15);
+    const locomotion = await import(pathToFileURL(join(out,'src/player/locomotion.mjs')).href);
+    const movement = {vx:0,vz:0,state:'IDLE',stateT:1};
+    locomotion.classifyGroundGait(movement);
+    assert.equal(movement.state,'IDLE');
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
   } finally {
