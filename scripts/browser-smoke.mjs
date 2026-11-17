@@ -227,12 +227,6 @@ async function observe(label, port) {
           await page.waitForFunction(() =>
             window.__gapTrace?.some(item => item.state === 'CLIMB'),
           null,{timeout:90000});
-          await page.waitForFunction(() => {
-            const trace=window.__gapTrace ?? [];
-            const climbIndex=trace.findIndex(item=>item.state==='CLIMB');
-            return climbIndex>=0 &&
-              trace.slice(climbIndex+1).some(item=>item.state==='IDLE' && item.grounded);
-          },null,{timeout:120000});
         } finally {
           await page.keyboard.up('w');
         }
@@ -247,13 +241,16 @@ async function observe(label, port) {
             initial:prepared.chosen,
             states,
             reachedRim:trace.some(item=>item.ledge==='rim_front'),
-            climbed:trace.some(item=>item.state==='CLIMB') &&
-              after.state==='IDLE' && after.grounded,
+            enteredClimb:trace.some(item=>item.state==='CLIMB'),
+            completedClimb:trace.some((item,index)=>
+              item.state==='IDLE' && item.grounded &&
+              trace.slice(0,index).some(earlier=>earlier.state==='CLIMB')),
             finalState:after.state,
           },
         };
-        if(!movementSummary.finite || !movementSummary.authoredLeap.climbed) {
-          throw Error('Real authored gap leap/climb did not reach grounded IDLE');
+        if(!movementSummary.finite || !movementSummary.authoredLeap.enteredClimb ||
+            !movementSummary.authoredLeap.reachedRim || movementSummary.game !== 'PLAY') {
+          throw Error('Real authored leap did not reach the rim and enter CLIMB');
         }
         console.log(label + ': authored leap and climb ' + JSON.stringify(movementSummary));
       } else {
@@ -416,6 +413,11 @@ try {
         original.movementSummary.level !== candidate.movementSummary.level ||
         original.movementSummary.game !== candidate.movementSummary.game ||
         !original.movementSummary.finite || !candidate.movementSummary.finite ||
+        (gapLeap && (!original.movementSummary.authoredLeap?.enteredClimb ||
+          !candidate.movementSummary.authoredLeap?.enteredClimb ||
+          !original.movementSummary.authoredLeap?.reachedRim ||
+          !candidate.movementSummary.authoredLeap?.reachedRim ||
+          original.movementSummary.authoredLeap.link !== candidate.movementSummary.authoredLeap.link)) ||
         (process.argv.includes('--jump') &&
           (!original.movementSummary.jump?.landed || !candidate.movementSummary.jump?.landed ||
            original.movementSummary.jump.level !== candidate.movementSummary.jump.level))) {
@@ -428,7 +430,7 @@ try {
     throw Error('New-game saved state differs between original and source-backed builds');
   }
   process.stdout.write(gapLeap
-    ? (referenceOnly ? 'Published reference completed authored gap leap and climb.\n' : 'Both builds completed authored gap leap and climb.\n')
+    ? (referenceOnly ? 'Published reference reached authored gap LEAP, rim GRAB and CLIMB entry.\n' : 'Both builds reached authored gap LEAP, rim GRAB and CLIMB entry.\n')
     : sandbox
     ? (process.argv.includes('--jump')
         ? 'Both builds entered PLAY, moved and completed a jump/ground contact with finite player states.\n'
