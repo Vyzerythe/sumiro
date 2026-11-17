@@ -76,6 +76,7 @@ async function serve(directory) {
   });
 }
 const servers = [];
+const interaction = process.argv.includes('--interaction');
 let browser;
 async function observe(label, port) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -103,6 +104,8 @@ async function observe(label, port) {
     await page.locator('#ink-ui .menu.on h1').waitFor({ state: 'visible', timeout: 15000 });
     const titleMenu = await page.locator('#ink-ui .menu.on h1').textContent();
     if (titleMenu?.trim() !== 'Sumiro') throw Error('Unexpected title screen: ' + titleMenu);
+    let saveSummary = null;
+    if (interaction) {
     console.log(label + ': clicking New Game');
     await page.locator('#ink-ui .menu.on li').filter({ hasText: /^New Game$/ }).click();
     console.log(label + ': waiting for persisted save');
@@ -123,10 +126,11 @@ async function observe(label, port) {
     }, null, { timeout: 45000 });
     console.log(label + ': PLAY state confirmed');
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('sumiro.save.v1')));
-    const saveSummary = {
+    saveSummary = {
       version: saved.v, chapter: saved.chapter, unlocked: saved.unlocked,
       started: saved.started, music: saved.options?.music,
     };
+    }
     const state = await page.evaluate(() => ({
       title: document.title,
       canvasCount: document.querySelectorAll('canvas').length,
@@ -170,10 +174,12 @@ try {
   if (candidate.title !== original.title) throw Error('Document title mismatch');
   if (original.bootVisible || candidate.bootVisible) throw Error('Boot overlay did not disappear');
   if (original.canvasCount !== candidate.canvasCount) throw Error('Canvas count mismatch');
-  if (JSON.stringify(original.saveSummary) !== JSON.stringify(candidate.saveSummary)) {
+  if (interaction && JSON.stringify(original.saveSummary) !== JSON.stringify(candidate.saveSummary)) {
     throw Error('New-game saved state differs between original and source-backed builds');
   }
-  process.stdout.write('Both builds booted, entered PLAY, persisted matching new-game saves, and loaded without errors.\n');
+  process.stdout.write(interaction
+    ? 'Both builds booted, entered PLAY, and persisted matching saves.\n'
+    : 'Both builds completed boot to the title menu without errors.\n');
 } finally {
   await browser?.close();
   await Promise.all(servers.map(({ server }) => new Promise((done) => server.close(done))));
