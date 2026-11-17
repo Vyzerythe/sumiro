@@ -113,3 +113,7 @@ The development build now replaces the original bundled `St`/`Ct`/`wt` ledge-gra
 ### Source-backed low-mantle subsystem
 
 The copied player runtime now delegates low-ledge probing, collision-normal mantle detection, mantle initiation, and clip-driven mantle completion to `src/player/mantle.mjs`. The original callbacks for animation, world queries, state changes, and falling are retained. Differential tests check query bounds, ground obstruction, carrier handling, animation progress, and the fallback when no landing surface is found. This complements the recovered ledge grab, hang, shimmy, and full climb transition, but does not yet recover the complete motion solver, player skeletal animation, scene routing, or combat.
+
+### Leap routing and flight controller
+
+The original player module's contiguous leap subsystem (target selection, rim index resolution, jump-link search, leap setup, in-flight trajectory, collision interruption, and landing) is now bridged into `src/player/leap.mjs`. The copied player retains only thin compatibility wrappers and passes its existing animation, collision, landing, GRAB and state-change callbacks to the source module. `tests/player-leap-parity.test.mjs` compares the recovered behavior with the original player function bodies for authored targets, flight progress, aborts, and landing transitions. Browser sandbox play is the next integration gate; the existing smoke test exercises walking and ordinary jumping, not authored gap leaps.
