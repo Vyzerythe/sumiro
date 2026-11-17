@@ -11,3 +11,5 @@ coverage/
 .env.*
 !.env.example
 
+.local-build/
+.local-build-test/
