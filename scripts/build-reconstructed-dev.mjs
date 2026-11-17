@@ -106,7 +106,7 @@ if (!headingFunction.test(playerText) || !timelineFunctions.test(playerText)) {
 const playerRewritten = [
   "import { interpolateHeading as U, runAnimationFrame as Ve, jogAnimationFrame as He, timelineState as Ue, timelineSurface as We } from '../../src/player/cinematic-timeline.mjs';",
   playerText.replace(headingFunction, '').replace(timelineFunctions, ''),
-].join('\\n');
+].join('\n');
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
