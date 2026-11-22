@@ -8,8 +8,9 @@
  * Run: node scripts/inventory-bundle.mjs > bundle-inventory.json
  */
 import { readdir, readFile, stat } from "node:fs/promises";
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const base = join(root, "sumiro");
@@ -18,22 +19,33 @@ const names = (await readdir(bundle)).filter((name) => name.endsWith(".js")).sor
 const fileSet = new Set(names);
 const chunks = [];
 
-function imports(source) {
-  const matches = [];
-  for (const [kind, pattern] of [
-    ["static", /\b(?:import|export)\s+(?:[^;]*?\s+from\s*)?["'](\.{1,2}\/[^"']+)["']/g],
-    ["dynamic", /\bimport\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g],
-  ]) {
-    for (const match of source.matchAll(pattern)) matches.push({ kind, specifier: match[1] });
+function imports(filename, source) {
+  const file = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
+  const matches = new Map();
+
+  function record(kind, node) {
+    if (!node || !ts.isStringLiteralLike(node) || !/^\.{1,2}\//.test(node.text)) return;
+    matches.set(kind + ":" + node.text, { kind, specifier: node.text });
   }
-  return [...new Map(matches.map((x) => [x.kind + ":" + x.specifier, x])).values()]
+
+  function visit(node) {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      record("static", node.moduleSpecifier);
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      record("dynamic", node.arguments[0]);
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  ts.forEachChild(file, visit);
+  return [...matches.values()]
     .sort((a, b) => a.specifier.localeCompare(b.specifier) || a.kind.localeCompare(b.kind));
 }
 
 for (const name of names) {
   const filename = join(bundle, name);
   const source = await readFile(filename, "utf8");
-  const references = imports(source).map(({ kind, specifier }) => {
+  const references = imports(filename, source).map(({ kind, specifier }) => {
     const path = resolve(dirname(filename), specifier.split(/[?#]/, 1)[0]);
     return {
       kind,
@@ -52,7 +64,7 @@ for (const name of names) {
 
 const report = {
   schemaVersion: 1,
-  description: "Read-only inventory of generated distribution chunks; source boundaries are unverified.",
+  description: "Read-only inventory of literal ESM imports in generated chunks; computed imports and source boundaries are outside this report.",
   entry: "index.html",
   jsChunks: chunks.length,
   totalJsBytes: chunks.reduce((sum, x) => sum + x.bytes, 0),

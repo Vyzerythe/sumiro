@@ -18,9 +18,13 @@ Then visit `http://localhost:8000/sumiro/` (not `/`).
 
 ## Distribution and reconstructed-source checks
 
+Use Node.js 22.18 or newer for the source toolchain.
+
 ```sh
-node --test tests/*.test.mjs
-node scripts/build-reconstructed-dev.mjs
+npm ci
+npm run typecheck
+npm test
+npm run build:dev
 python3 -m http.server 8000 --directory .local-build
 # Open http://localhost:8000/sumiro/
 ```
@@ -34,7 +38,7 @@ The tests ensure that:
 - checked-in JSON configuration files have valid syntax;
 - files identified by the audio index and audio manifests actually exist.
 
-**Additional test coverage:** chapter progression functions, save migration and storage behavior, collectible scroll data, collision geometry, moving-body transforms, spatial indexing, ground queries, raycasts and capsule sweeps are tested against the published compiled implementation. CI separately boots both builds in Chromium and verifies a visible title menu with no uncaught JS/network failures.
+**Additional test coverage:** chapter progression, saves, collectible data, collision queries and player movement are compared against the shipped implementation. The movement-trail tests exercise walkable segments, interrupted movement, and absolute indexes after the history rolls over. The development-build test imports the emitted trail adapter and checks its five exports. CI separately checks both builds in Chromium.
 
 **Not yet verified:** gameplay progression beyond the title, audio output, realistic rendering, complete source-build reproducibility and cross-browser support. The opt-in New Game interaction probe is currently inconclusive on the *published reference* under headless software rendering. See [the development-build guide](SOURCE_BACKED_DEV_BUILD.md) and [manual release checks](RELEASE_CHECKLIST.md).
 
@@ -44,5 +48,5 @@ Documentation or validation changes can be made here directly by pull request. A
 
 ## Toolchain policy
 
-No authoritative upstream package manifest or lockfile has been recovered. The current reconstruction uses built-in Node test facilities; Playwright is installed transiently only in the browser CI job. Do not add guessed runtime dependencies, a placeholder production package manifest, or a speculative bundler configuration before the actual source/build requirements are established.
+The reconstruction pins Three.js r187, matching types, and TypeScript in its own lockfile. The compiler checks new TypeScript modules and emits browser modules into the isolated development build. It also parses the published literal import graph for `npm run inventory`. Existing JavaScript source modules still participate in the transitional build. The browser CI job installs its driver separately.
 

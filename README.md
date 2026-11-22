@@ -33,7 +33,18 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 
 ## Validate changes
 
-With Node.js 22 or newer, run `node --test tests/*.test.mjs` for distribution integrity, differential source parity and development-build integration tests. For a source-backed development distribution, run `node scripts/build-reconstructed-dev.mjs`, then serve `.local-build/` over HTTP and visit `/sumiro/`. The build is **not** a full source compilation and must not be deployed in place of the published game.
+Use Node.js 22.18 or newer for source development.
+
+```sh
+npm ci
+npm run typecheck
+npm test
+npm run build:dev
+```
+
+Serve `.local-build/` over HTTP and visit `/sumiro/` to run the transitional build. It compiles recovered TypeScript and uses adapters to load recovered modules into the published runtime. Keep production deployments on the published distribution while reconstruction is in progress.
+
+The target source stack is strict TypeScript and Three.js r187 with WebGPU and TSL. The development build currently uses the shipped WebGL renderer for compatibility while the types and application modules are recovered.
 
 GitHub Actions also runs a Chromium comparison of the published and development builds through the title screen. It does **not** prove gameplay/save-reload parity; the New Game transition test remains a documented opt-in diagnostic. See [source-backed build and test limitations](docs/SOURCE_BACKED_DEV_BUILD.md) and [release checks](docs/RELEASE_CHECKLIST.md).
 

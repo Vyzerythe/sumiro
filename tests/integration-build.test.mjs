@@ -13,17 +13,19 @@ const chapters = 'sumiro/bundle/chapters-B8aGs4KP.js';
 const kit = 'sumiro/bundle/kit-B01EgPBo.js';
 const collision = 'sumiro/bundle/collision-DtBQEpmQ.js';
 const player = 'sumiro/bundle/player-1_KrBWnI.js';
+const trail = 'sumiro/bundle/trail-BFIL-IHB.js';
 
 test('source-backed build preserves originals and binds live domain imports', async () => {
   const hash = data => createHash('sha256').update(data).digest('hex');
-  const before = await Promise.all([game, chapters, kit, collision, player].map(p => readFile(join(root,p))));
+  const publishedChunks = [game, chapters, kit, collision, player, trail];
+  const before = await Promise.all(publishedChunks.map(p => readFile(join(root,p))));
   try {
     const result = spawnSync(process.execPath, ['scripts/build-reconstructed-dev.mjs', '--out', out], {
       cwd: root,
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    const after = await Promise.all([game, chapters, kit, collision, player].map(p => readFile(join(root,p))));
+    const after = await Promise.all(publishedChunks.map(p => readFile(join(root,p))));
     assert.deepEqual(after.map(hash), before.map(hash), 'published files changed');
     const [outputGame, outputChapters, outputKit, outputCollision, outputPlayer, report, index] = await Promise.all([
       readFile(join(out,game),'utf8'),
@@ -121,6 +123,15 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.equal(typeof playerMotion.finishLanding,'function');
     const saves = await import(pathToFileURL(join(out,'src/domain/save.mjs')).href);
     assert.equal(saves.createDefaultRun().chapter, 'ch1_climb');
+    const trailAdapter = await import(pathToFileURL(join(out, trail)).href);
+    const readableTrail = await import(pathToFileURL(join(out, 'src/player/movement-trail.mjs')).href);
+    assert.deepEqual({ ...trailAdapter }, {
+      a: readableTrail.findWalkableSegment,
+      i: readableTrail.trailGroundAt,
+      n: readableTrail.trailHeightTolerance,
+      r: readableTrail.createMovementTrail,
+      t: readableTrail.trailCapsule,
+    });
   } finally {
     await rm(out, { recursive: true, force: true });
   }

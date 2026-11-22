@@ -22,6 +22,8 @@ This plan separates what can be improved **in the published-artifact repository 
 
 ## P1.5 — progressive engine reconstruction
 
+- [x] Pin Three.js r187 and install a strict, lockfile-based TypeScript build and type-checking path.
+- [x] Replace the movement-trail chunk in the transitional build with a typed module. Verify its geometry and state against the shipped implementation.
 - [x] Integrate chapter, save, scroll and the collision-world factory (spatial queries, raycasts, capsule sweeps, moving bodies) into a guarded, isolated development build, with differential tests.
 - [x] Reconstruct and integrate bounded player input, gait, jump/fall, low-mantle, ledge grab, hang, shimmy and climb transitions with differential tests.
 - [x] Integrate authored leap targeting, flight interpolation, interruption and landing into the source-backed development player, retaining differential parity checks.
@@ -29,6 +31,7 @@ This plan separates what can be improved **in the published-artifact repository 
 - [ ] Recover the remaining high-level locomotion/animation state machine, combat, game state, HUD, audio, rendering and scene/engine dependencies with independent parity checks.
 - [ ] Resolve the published game's headless `CHAPTER_CARD` transition diagnostic and establish an authoritative gameplay/browser test baseline.
 - [ ] Replace the transitional chunk adapter with an explicit, versioned, reproducible source build only after application dependency and parity gates pass.
+- [ ] Port scene composition, render targets, ink materials, and post-processing to the Three.js r187 WebGPU renderer and TSL. Verify the actual backend, shader compilation, scene and effect parity, rendering performance, resize, and resource disposal.
 
 ## P2 — release maturity
 

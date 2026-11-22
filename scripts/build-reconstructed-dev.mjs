@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compileReconstructedSource } from './compile-reconstructed-source.mjs';
 
 const root = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const outArg = process.argv.indexOf('--out');
@@ -26,12 +27,14 @@ const originalChapters = join(root, 'sumiro/bundle/chapters-B8aGs4KP.js');
 const originalKit = join(root, 'sumiro/bundle/kit-B01EgPBo.js');
 const originalCollision = join(root, 'sumiro/bundle/collision-DtBQEpmQ.js');
 const originalPlayer = join(root, 'sumiro/bundle/player-1_KrBWnI.js');
+const originalTrail = join(root, 'sumiro/bundle/trail-BFIL-IHB.js');
 const EXPECTED_GIT_BLOBS = {
   game: '284349f2f8d0235e163f3c9b88b17ed222e3b269',
   chapters: '3da4e0f31fed783d0e548dd40fd0c1113cca16ec',
   kit: 'd92a7b85baceb33cf9c7243a27fbfea98fa5436d',
   collision: 'bb06154a9be5a24421a017f4c84adf7c87064d1b',
   player: '2ba1dbb18011510e025d5f3af06b045f143a3d10',
+  trail: '950ee6272e85d1c446a2de97ce0df4930c6d3145',
 };
 const sha = data => createHash('sha1')
   .update('blob ' + Buffer.byteLength(data) + '\0')
@@ -41,7 +44,8 @@ const chapters = await readFile(originalChapters);
 const kit = await readFile(originalKit);
 const collision = await readFile(originalCollision);
 const player = await readFile(originalPlayer);
-if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters || sha(kit) !== EXPECTED_GIT_BLOBS.kit || sha(collision) !== EXPECTED_GIT_BLOBS.collision || sha(player) !== EXPECTED_GIT_BLOBS.player) {
+const trail = await readFile(originalTrail);
+if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters || sha(kit) !== EXPECTED_GIT_BLOBS.kit || sha(collision) !== EXPECTED_GIT_BLOBS.collision || sha(player) !== EXPECTED_GIT_BLOBS.player || sha(trail) !== EXPECTED_GIT_BLOBS.trail) {
   throw Error('Published bundle has changed: audit integration boundaries before rebuilding');
 }
 
@@ -170,15 +174,30 @@ const playerRewritten = [
       'function bt(e){finishLanding(q,e,k,{world:v,shake:Ie,sound:name=>p.set(`audio.cue`,{name}),hurt:Ht,isDead:Fe,die:Bt,play:(name,opts)=>y.play(name,opts),footstep:qt,changeState:J,consumeBufferedJump:_t})}'),
 ].join('\n');
 
+const trailAdapter = [
+  'export { findWalkableSegment as a, trailGroundAt as i, trailHeightTolerance as n,',
+  "  createMovementTrail as r, trailCapsule as t } from '../../src/player/movement-trail.mjs';",
+  '',
+].join('\n');
+const compiledSource = compileReconstructedSource(root, join(output, 'src'));
+
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(join(root, 'sumiro'), join(output, 'sumiro'), { recursive: true });
-await cp(join(root, 'src'), join(output, 'src'), { recursive: true });
+await cp(join(root, 'src'), join(output, 'src'), {
+  recursive: true,
+  filter: path => !/\.m?ts$/.test(path),
+});
+for (const [path, contents] of compiledSource) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, contents);
+}
 await writeFile(join(output, 'sumiro/bundle/game-B5zfa1fm.js'), rewritten);
 await writeFile(join(output, 'sumiro/bundle/chapters-B8aGs4KP.js'), chapterAdapter);
 await writeFile(join(output, 'sumiro/bundle/kit-B01EgPBo.js'), kitRewritten);
 await writeFile(join(output, 'sumiro/bundle/collision-DtBQEpmQ.js'), collisionRewritten);
 await writeFile(join(output, 'sumiro/bundle/player-1_KrBWnI.js'), playerRewritten);
+await writeFile(join(output, 'sumiro/bundle/trail-BFIL-IHB.js'), trailAdapter);
 
 const report = {
   kind: 'transitional-source-backed-development-build',
@@ -189,8 +208,9 @@ const report = {
     'sumiro/bundle/kit-B01EgPBo.js',
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
+    'sumiro/bundle/trail-BFIL-IHB.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');
