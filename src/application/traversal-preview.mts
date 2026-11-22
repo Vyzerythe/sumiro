@@ -6,8 +6,9 @@ import { createFollowCamera } from '../rendering/follow-camera.mts';
 import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
 import { createInkSurfaceOutput } from '../rendering/ink-surface-pass.mts';
 import { createSourceRuntime } from '../runtime/source-runtime.mts';
+import { resolveChapterOneSpawn } from './chapter-one-checkpoints.mts';
 import { installChapterOneObstacles } from './chapter-one-obstacles.mts';
-import { chapterOneGroundRegions, chapterOneSpawn } from './chapter-one-terrain.mts';
+import { chapterOneGroundRegions } from './chapter-one-terrain.mts';
 import { chapterOneCameraAreas, chapterOneRail } from './chapter-one-rail.mts';
 
 const SURFACE_COLORS: Readonly<Record<string, number>> = {
@@ -17,10 +18,12 @@ const SURFACE_COLORS: Readonly<Record<string, number>> = {
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 interface TraversalPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'gpu' | 'input' | 'viewport'> {
   canvas: HTMLCanvasElement | OffscreenCanvas;
+  resume?: NonNullable<Parameters<typeof resolveChapterOneSpawn>[0]>;
 }
 
 /** Isolated collision preview for the authored Chapter One terrain. */
-export async function createTraversalPreview({ canvas, ...options }: TraversalPreviewOptions) {
+export async function createTraversalPreview({ canvas, resume, ...options }: TraversalPreviewOptions) {
+  const spawn = resolveChapterOneSpawn(resume);
   const scene = new Scene();
   scene.background = new Color(0xc9c6bf);
   const camera = new PerspectiveCamera(52, options.viewport.width / options.viewport.height, 0.1, 100);
@@ -39,7 +42,7 @@ export async function createTraversalPreview({ canvas, ...options }: TraversalPr
           const world = createCollisionWorld();
           const ground = installGroundAsset(world, bytes, chapterOneGroundRegions);
           installChapterOneObstacles(world, ground);
-          player = createTraversalController(world, chapterOneSpawn);
+          player = createTraversalController(world, spawn);
           cameraRig = createFollowCamera({ rail: chapterOneRail, world, wayUpAreas: chapterOneCameraAreas });
           const surfaceVertices = new Map<CollisionSurface, CollisionTriangle[]>();
           for (const triangle of world.triangles()) {

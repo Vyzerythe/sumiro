@@ -1,3 +1,4 @@
+import { createRunProgress } from '../domain/run-progress.mts';
 import { createChapterPreview } from './chapter-preview.mts';
 import { createTraversalPreview } from './traversal-preview.mts';
 
@@ -19,11 +20,17 @@ window.addEventListener('pagehide', event => {
 }, { signal: page.signal });
 
 const assetBaseURL = new URL('../sumiro/assets/', document.baseURI);
-const walk = new URLSearchParams(window.location.search).get('walk') === '1';
+const query = new URLSearchParams(window.location.search);
+const walk = query.get('walk') === '1';
 try {
+  const progress = walk && query.get('continue') === '1' ? createRunProgress({
+    getItem: key => localStorage.getItem(key),
+    setItem: (key, value) => localStorage.setItem(key, value),
+  }) : null;
   const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
   const runtime = walk
-    ? await createTraversalPreview({ ...options, input: { keyboardTarget: window, getGamepads: () => navigator.getGamepads() } })
+    ? await createTraversalPreview({ ...options, ...(progress?.hasSave ? { resume: progress.current } : {}),
+      input: { keyboardTarget: window, getGamepads: () => navigator.getGamepads() } })
     : await createChapterPreview(options);
   if (page.signal.aborted) {
     await runtime.dispose();

@@ -5,6 +5,8 @@ import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene }
 import { mix, uniform, vec3, vec4 } from 'three/tsl';
 import { createChapterPreview } from '../../src/application/chapter-preview.mts';
 import { createTraversalPreview } from '../../src/application/traversal-preview.mts';
+import { createRunProgress } from '../../src/domain/run-progress.mts';
+import { createDefaultRun } from '../../src/domain/save.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
 import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
 import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
@@ -391,4 +393,28 @@ try {
   }));
 } finally {
   await traversal.dispose();
+}
+
+const resumedRun = createRunProgress({
+  getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau' }),
+  setItem() { throw Error('The preview must never save a resumed run'); },
+});
+const resumed = await createTraversalPreview({
+  canvas,
+  viewport: { width: 96, height: 72, pixelRatio: 1 },
+  assets: chapterAssets,
+  resume: resumedRun.current,
+  gpu: nativeGpu,
+});
+try {
+  const position = resumed.context.registry.get('player.position');
+  assert.deepEqual([position.x, position.z], [14.6, -56.6]);
+  assert.ok(position.grounded && position.y > 8);
+  device.pushErrorScope('validation');
+  resumed.render();
+  const error = await device.popErrorScope();
+  assert.equal(error, null, error?.message);
+  console.log('Chapter checkpoint WebGPU resume', JSON.stringify(position));
+} finally {
+  await resumed.dispose();
 }
