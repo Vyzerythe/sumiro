@@ -4,9 +4,8 @@ import { firstChapterId } from '../domain/chapters.mts';
 import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
 import { createChapterManager } from '../runtime/chapter-manager.mts';
 import { createSourceRuntime } from '../runtime/source-runtime.mts';
-import { chapterThreeSceneAssets } from './chapter-three-world.mts';
-import { loadChapterTwoScene } from './chapter-two-scene.mts';
 import { loadInkSceneAsset } from './ink-scene-asset.mts';
+import { getStaticChapter } from './static-chapter-catalog.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 
@@ -50,13 +49,9 @@ export async function createChapterPreview({ canvas, chapter = firstChapterId, .
           const chapters = createChapterManager<Object3D, Sphere>({
             scene: stage,
             async load(id, resources) {
-              if (id === 'ch2_pass') {
-                const root = await loadChapterTwoScene(context.assets, resources);
-                return { root, data: new Box3().setFromObject(root).getBoundingSphere(new Sphere()) };
-              }
-              const path = id === firstChapterId ? 'levels/ch1_climb/pieces.glb' : id === 'ch3_pines' ? chapterThreeSceneAssets.world : null;
-              if (!path) throw Error(`Geometry preview is unavailable for ${id}`);
-              const root = await loadInkSceneAsset(context.assets, path, resources);
+              const root = id === firstChapterId
+                ? await loadInkSceneAsset(context.assets, 'levels/ch1_climb/pieces.glb', resources)
+                : await getStaticChapter(id).loadGeometry(context.assets, resources);
               const box = new Box3().setFromObject(root);
               if (box.isEmpty()) throw Error('Chapter geometry contains no bounded meshes');
               return { root, data: box.getBoundingSphere(new Sphere()) };

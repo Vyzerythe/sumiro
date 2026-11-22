@@ -16,12 +16,9 @@ import { createChapterOneInteractions, type ChapterOneInteractionEvent } from '.
 import { chapterOneLedges, chapterOneLeapLinks } from './chapter-one-ledges.mts';
 import { chapterOneGateBarrier } from './chapter-one-obstacles.mts';
 import { loadChapterOneTraversalScene } from './chapter-one-scene.mts';
-import { chapterThreeSceneAssets, createChapterThreeWorld } from './chapter-three-world.mts';
 import { createChapterTwoMechanisms } from './chapter-two-mechanisms.mts';
 import { bindChapterTwoPresentation } from './chapter-two-presentation.mts';
-import { loadChapterTwoScene } from './chapter-two-scene.mts';
-import { createChapterTwoWorld } from './chapter-two-world.mts';
-import { loadInkSceneAsset } from './ink-scene-asset.mts';
+import { getStaticChapter } from './static-chapter-catalog.mts';
 import { createStaticTraversalCamera } from './static-traversal-camera.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
@@ -160,9 +157,11 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                 });
                 return { root, data: { player, story, view: createChapterOneCamera(world, actor.duration('climb_up')), killDrop: 5.5 } };
               }
+              const definition = getStaticChapter(id);
+              const { world, spawn, killDrop = Infinity, killY } = definition.createWorld();
+              const root = await definition.loadGeometry(context.assets, resources);
+              let mechanisms: TraversalChapter['mechanisms'];
               if (id === 'ch2_pass') {
-                const { world, spawn, killDrop, killY } = createChapterTwoWorld();
-                const root = await loadChapterTwoScene(context.assets, resources);
                 const driver = createChapterTwoMechanisms(world, {
                   hasFlag: flag => Boolean(progress.current.flags[flag]), setFlag: flag => { progress.setFlag(flag); },
                   onEvent(event) {
@@ -171,18 +170,11 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                   },
                 });
                 resources.defer(() => driver.dispose());
-                const present = bindChapterTwoPresentation(root, driver);
-                const player = createTraversalController(world, spawn, { ledges: [], leapLinks: [], duration: actor.duration, canInkStep });
-                return { root, data: { player, view: createStaticTraversalCamera(world, id), killDrop, killY, mechanisms: { driver, present } } };
+                mechanisms = { driver, present: bindChapterTwoPresentation(root, driver) };
               }
-              if (id === 'ch3_pines') {
-                const { world, spawn, killDrop, killY } = createChapterThreeWorld();
-                const root = await loadInkSceneAsset(context.assets, chapterThreeSceneAssets.world, resources);
-                root.name = id;
-                const player = createTraversalController(world, spawn, { ledges: [], leapLinks: [], duration: actor.duration, canInkStep });
-                return { root, data: { player, view: createStaticTraversalCamera(world, id), killDrop, killY } };
-              }
-              throw Error(`Native traversal is unavailable for ${id}`);
+              const player = createTraversalController(world, spawn, { ledges: [], leapLinks: [], duration: actor.duration, canInkStep });
+              return { root, data: { player, view: createStaticTraversalCamera(world, id), killDrop, killY,
+                ...(mechanisms ? { mechanisms } : {}) } };
             },
           });
           const manager = chapters;

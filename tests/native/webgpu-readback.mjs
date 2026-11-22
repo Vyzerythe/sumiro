@@ -11,6 +11,7 @@ import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
 import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
 import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
 import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
+import { installDracoWorker } from './draco-worker.mjs';
 
 const gpu = create(process.argv.slice(2));
 let pendingFrame;
@@ -64,7 +65,10 @@ const nativeGpu = {
   async requestAdapter(options) {
     const adapter = await gpu.requestAdapter(options);
     assert.ok(adapter, 'Dawn must expose a WebGPU adapter');
-    console.log('WebGPU adapter', adapter.info.description);
+    const { vendor, architecture, device: name, description, isFallbackAdapter } = adapter.info;
+    assert.equal(isFallbackAdapter, false, 'the native test requires a hardware adapter');
+    assert.doesNotMatch([vendor, architecture, name, description].join(' '), /swiftshader|llvmpipe|lavapipe|\bwarp\b|software/i);
+    console.log('WebGPU adapter', JSON.stringify({ vendor, architecture, device: name, description, isFallbackAdapter }));
     return {
       async requestDevice(descriptor) {
         device = await adapter.requestDevice(descriptor);
@@ -441,6 +445,7 @@ try {
 
 const checkpoints = [];
 let rejectCourt = true;
+let restoreDraco;
 const resumedRun = createRunProgress({
   getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau', flags: { inkStep: true }, abilities: { inkStep: true } }),
   setItem(key, value) { checkpoints.push([key, JSON.parse(value)]); },
@@ -545,6 +550,41 @@ try {
   const pinesError = await device.popErrorScope();
   assert.equal(pinesError, null, pinesError?.message);
   console.log('Native pines WebGPU readback', JSON.stringify({ pines, pinesPixel }));
+
+  restoreDraco = installDracoWorker();
+  const laterChapters = [
+    ['ch4_temple', 30, 8, -43],
+    ['ch5_sea', 30, 3.6, -64],
+    ['ch6_summit', 29, 10, -50],
+  ];
+  for (const [id, x, y, z] of laterChapters) {
+    const prior = resumed.context.scene.getObjectByName(resumedRun.current.chapter);
+    assert.ok(prior?.parent);
+    assert.equal(await resumed.advanceChapter(), true);
+    const root = resumed.context.scene.getObjectByName(id);
+    assert.ok(root?.parent && prior.parent === null);
+    assert.equal(resumedRun.current.chapter, id);
+    pendingFrame(performance.now());
+    device.pushErrorScope('validation');
+    resumed.render();
+    const feet = resumed.context.registry.get('player.position');
+    assert.deepEqual([feet.x, feet.y, feet.z, feet.grounded], [x, y, z, true]);
+    let meshes = 0;
+    root.traverse(object => { if (object.isMesh && object.geometry.attributes.position.count > 0) meshes++; });
+    assert.ok(meshes > 0, 'the actual chapter asset must decode into drawable meshes');
+    const samples = [[24, 52], [36, 56], [48, 56], [60, 56], [72, 52]];
+    const visible = await Promise.all(samples.map(([x, y]) => sample(x, y)));
+    root.visible = false;
+    pendingFrame(performance.now());
+    resumed.render();
+    const hidden = await Promise.all(samples.map(([x, y]) => sample(x, y)));
+    assert.ok(visible.some((pixel, index) => pixel.slice(0, 3)
+      .some((channel, component) => Math.abs(channel - hidden[index][component]) > 8)), `${id} must contribute pixels`);
+    root.visible = true;
+    const validation = await device.popErrorScope();
+    assert.equal(validation, null, validation?.message);
+    console.log('Native chapter WebGPU readback', JSON.stringify({ id, feet, meshes, center: visible[2] }));
+  }
 } finally {
-  await resumed.dispose();
+  try { await resumed.dispose(); } finally { restoreDraco?.(); }
 }
