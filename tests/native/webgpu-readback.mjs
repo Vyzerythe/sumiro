@@ -99,6 +99,35 @@ const foreground = new Mesh(foregroundGeometry, foregroundMaterial);
 foreground.position.set(0.2, 0, 1);
 const keyboardTarget = new EventTarget();
 
+function keyboardDriver(runtime) {
+  const held = new Set();
+  const dispatch = (type, code) => keyboardTarget.dispatchEvent(Object.assign(new Event(type), { code, repeat: false }));
+  function hold(desired) {
+    for (const code of held) if (!desired.has(code)) { dispatch('keyup', code); held.delete(code); }
+    for (const code of desired) if (!held.has(code)) { dispatch('keydown', code); held.add(code); }
+  }
+  return {
+    hold,
+    release() { hold(new Set()); },
+    tap(code, steps = 1) {
+      dispatch('keydown', code);
+      for (let step = 0; step < steps; step++) runtime.step();
+      dispatch('keyup', code);
+    },
+    steer(target, position, stopRadius) {
+      const dx = target.x - position.x, dz = target.z - position.z;
+      const distance = Math.hypot(dx, dz);
+      const desired = new Set();
+      if (distance > stopRadius) {
+        if (Math.abs(dx) > Math.abs(dz) * 0.4) desired.add(dx > 0 ? 'KeyD' : 'KeyA');
+        if (Math.abs(dz) > Math.abs(dx) * 0.4) desired.add(dz < 0 ? 'KeyW' : 'KeyS');
+      }
+      hold(desired);
+      return distance;
+    },
+  };
+}
+
 function pressSpace() {
   const event = Object.assign(new Event('keydown', { cancelable: true }), {
     code: 'Space', repeat: false, ctrlKey: false, altKey: false,
@@ -318,12 +347,12 @@ try {
 
 const assetURL = new URL('../../sumiro/assets/', import.meta.url);
 
-// Dawn runs in Node, which lacks the browser JPEG decoder used by GLTFLoader.
-// Keep the original GLB geometry, skin, and clips and omit the single texture binding in memory.
-function rigWithoutJpeg(bytes) {
+// Dawn runs in Node, which lacks the browser image decoders used by GLTFLoader.
+// Keep the original rig geometry, skin and animation and omit its texture binding in memory.
+function rigWithoutImage(bytes) {
   const jsonEnd = 20 + bytes.readUInt32LE(12);
   const gltf = JSON.parse(bytes.toString('utf8', 20, jsonEnd));
-  assert.equal(gltf.images[0].mimeType, 'image/jpeg');
+  assert.match(gltf.images[0].mimeType, /^image\/(jpeg|png)$/);
   delete gltf.materials[0].pbrMetallicRoughness.baseColorTexture;
   const json = Buffer.from(JSON.stringify(gltf));
   const paddedLength = Math.ceil(json.length / 4) * 4;
@@ -340,7 +369,8 @@ const chapterAssets = {
   async fetch(path) {
     const url = new URL(path);
     const bytes = await readFile(url);
-    return new Response(url.pathname.endsWith('/player/player.glb') ? rigWithoutJpeg(bytes) : bytes);
+    const rig = /\/(player\/player|cat\/cat)\.glb$/.test(url.pathname);
+    return new Response(rig ? rigWithoutImage(bytes) : bytes);
   },
 };
 const chapter = await createChapterPreview({
@@ -521,6 +551,18 @@ try {
   assert.deepEqual([arrival.x, arrival.z], [14, -15.5]);
   assert.equal(arrival.grounded, true);
   assert.equal(resumed.context.registry.get('chapter.current'), 'ch2_pass');
+  resumed.step();
+  const cat = resumed.context.scene.getObjectByName('companion');
+  assert.ok(cat?.visible);
+  assert.equal(resumed.context.registry.get('companion.state').phase, 'CARRIED');
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyF', repeat: false }));
+  resumed.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyF' }));
+  assert.equal(resumed.context.registry.get('companion.state').phase, 'IDLE');
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyF', repeat: false }));
+  resumed.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyF' }));
+  assert.equal(resumed.context.registry.get('companion.state').phase, 'CARRIED');
   const chapterTwoPixel = await sample(48, 58);
   assert.equal(chapterTwoPixel[3], 255);
   assert.ok(chapterTwoPixel[0] > 100 && chapterTwoPixel[0] - chapterTwoPixel[1] < 35,
@@ -538,35 +580,12 @@ try {
   assert.equal(switchError, null, switchError?.message);
   console.log('Native chapter switch WebGPU readback', JSON.stringify({ arrival, chapterTwoPixel }));
 
-  function key(code, steps) {
-    keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: false }));
-    for (let step = 0; step < steps; step++) resumed.step();
-    keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code }));
-  }
+  const { tap: key, steer: steerToward, release: releaseArrows } = keyboardDriver(resumed);
   key('KeyD', 43);
   for (let step = 0; step < 16; step++) resumed.step();
   keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
   for (let step = 0; step < 235 && resumed.context.registry.get('player.position').z > -35.4; step++) resumed.step();
   keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyW' }));
-  const held = new Set();
-  function steerToward(target, position, stopRadius) {
-    const dx = target.x - position.x, dz = target.z - position.z;
-    const distance = Math.hypot(dx, dz);
-    const desired = new Set();
-    if (distance > stopRadius) {
-      if (Math.abs(dx) > Math.abs(dz) * 0.4) desired.add(dx > 0 ? 'KeyD' : 'KeyA');
-      if (Math.abs(dz) > Math.abs(dx) * 0.4) desired.add(dz < 0 ? 'KeyW' : 'KeyS');
-    }
-    for (const code of held) if (!desired.has(code)) {
-      keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code }));
-      held.delete(code);
-    }
-    for (const code of desired) if (!held.has(code)) {
-      keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: false }));
-      held.add(code);
-    }
-    return distance;
-  }
 
   const readDuel = () => resumed.context.registry.get('combat.sword-wraith');
   assert.equal(readDuel().phase, 'fighting');
@@ -593,7 +612,7 @@ try {
     if (steerToward(bell, resumed.context.registry.get('player.position'), 1.2) <= 1.2) break;
     resumed.step();
   }
-  steerToward(bell, bell, 0);
+  releaseArrows();
   key('KeyJ', 1);
   assert.equal(resumedRun.current.flags.ch2_court_door, true, 'an attack near the bell must open the court');
   for (let step = 0; step < 55; step++) resumed.step();
@@ -701,4 +720,49 @@ try {
   console.log('Native Sea shrine resume', JSON.stringify(feet));
 } finally {
   await seaResume.dispose();
+}
+
+let pinesWrite;
+const pinesProgress = createRunProgress({
+  getItem: () => JSON.stringify({ ...createDefaultRun(), chapter: 'ch3_pines', shrine: 'pines_1' }),
+  setItem(_key, value) { pinesWrite = JSON.parse(value); },
+});
+const pinesCombat = await createTraversalPreview({
+  canvas,
+  viewport: { width: 96, height: 72, pixelRatio: 1 },
+  assets: chapterAssets,
+  progress: pinesProgress,
+  input: { keyboardTarget },
+  random: () => 0.3,
+  gpu: nativeGpu,
+});
+const pinesInput = keyboardDriver(pinesCombat);
+try {
+  const { registry } = pinesCombat.context;
+  pinesInput.tap('KeyA', 65);
+  const encounter = () => registry.get('combat.encounters');
+  assert.equal(encounter().actors.filter(actor => actor.alive).length, 2, JSON.stringify(registry.get('player.position')));
+  device.pushErrorScope('validation');
+  pinesCombat.render();
+  assert.equal(await device.popErrorScope(), null);
+  for (let step = 0; step < 2600 && !pinesProgress.current.flags.ch3_pines_first; step++) {
+    const { actors, player } = encounter();
+    const feet = registry.get('player.position');
+    const living = actors.filter(actor => actor.alive);
+    const distanceOf = actor => Math.hypot(actor.x - feet.x, actor.z - feet.z);
+    const enemy = living.sort((a, b) => distanceOf(a) - distanceOf(b))[0];
+    if (!enemy || player.action === 'DEATH') break;
+    const distance = pinesInput.steer(enemy, feet, 1.9);
+    const keyframe = enemy.move === 'overhead' ? [8.4, 9.4] : [4.3, 5.1];
+    if (distance < 2.7 && enemy.state === 'MOVE' && enemy.frame > keyframe[0] && enemy.frame < keyframe[1] && player.action !== 'PARRY') {
+      pinesInput.tap('KeyK');
+    } else if (distance < 2.7 && step % 6 === 0 && enemy.awake) pinesInput.tap('KeyJ');
+    else pinesCombat.step();
+  }
+  assert.equal(pinesWrite?.flags.ch3_pines_first, true, JSON.stringify(encounter()));
+  console.log('Native Pines encounter clear', JSON.stringify({ actors: encounter().actors.map(actor => [actor.id, actor.hp]),
+    strokes: encounter().player.strokes }));
+} finally {
+  pinesInput.release();
+  await pinesCombat.dispose();
 }

@@ -54,7 +54,7 @@ To serve the native application, run `npm run build:source` and serve the reposi
 
 The traversal preview uses the supplied player model and its traversal clips. Use `?walk=1&continue=1` to read an existing checkpoint from the same browser origin. The preview resolves the authored shrine stand and leaves stored browser saves untouched. The native tests inject a writable store to verify explicit shrine interaction saves in Chapters One and Five.
 
-The native runtime advances the Pines bridges, crumbles, tilting platforms and gusts, the Temple bells and lifts, the Sea tide and floating carriers, and the Summit ice holds. The Sea's TSL water uses the authored noise and tide controls. The published shoreline and mirror passes, parts of later encounter logic, and several chapter-specific effects remain to be recovered.
+The native runtime advances the Pines bridges, crumbles, tilting platforms and gusts, the Temple bells and lifts, the Sea tide, veils and floating carriers, and the Summit lift, ice holds and wind. The Sea's TSL water uses the authored noise and tide controls. The native encounter controller plays the authored wraith, archer and ronin waves. F picks up or sets down the cat, which follows the recorded ground trail when set down. The published shoreline and mirror passes, detailed companion choreography, and several chapter-specific effects remain to be recovered.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 
@@ -64,7 +64,7 @@ npm --prefix tests/native ci --ignore-scripts
 npm run test:gpu
 ```
 
-On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture requires a hardware adapter. It verifies resize and teardown, compares rendered pixels against an independent grade calculation, and checks normal encoding, surface IDs, depth, contour darkening and the Chapter Two terrain palette. It also exercises the supplied player rig, walking and jumping, checkpoint writes, the first sword-wraith fight and door, transactional chapter swaps, and pixel readback from later chapters. Chapter Six uses the installed Three.js Draco decoder through a Node worker. The Node fixture omits the player GLB's embedded JPEG binding in memory. The browser loads the original GLB.
+On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture requires a hardware adapter. It verifies resize and teardown, compares rendered pixels against an independent grade calculation, and checks normal encoding, surface IDs, depth, contour darkening and the Chapter Two terrain palette. It also exercises the supplied rigs, walking and jumping, checkpoint writes, pickup and carry, the first court and Pines encounters, transactional chapter swaps, and pixel readback from later chapters. Chapter Six uses the installed Three.js Draco decoder through a Node worker. The Node fixture omits the player and cat rigs' embedded image bindings in memory. The browser loads the original GLBs.
 
 ## Toolchain policy
 

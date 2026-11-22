@@ -15,7 +15,7 @@ const PLAYER_MODEL = 'player/player.glb';
 const GAIT_CLIPS = ['stand_idle', 'walk', 'jog', 'run', 'sprint'] as const;
 const ACTION_CLIPS = ['jump_up', 'jump_fwd', 'fall', 'land', 'land_heavy'] as const;
 const GESTURE_CLIPS = ['jump_windup', 'leap_generic', 'wall_leap', 'hang_idle', 'climb_up', 'mantle_low', 'dodge', 'ink_step'] as const;
-const COMBAT_CLIPS = ['idle_sword', 'run_sword', 'draw', 'attack_1', 'attack_2', 'attack_3', 'parry', 'parry_riposte', 'hit', 'death', 'rise'] as const;
+const COMBAT_CLIPS = ['idle_sword', 'run_sword', 'draw', 'attack_1', 'attack_2', 'attack_3', 'parry', 'parry_riposte', 'hit', 'death', 'rise', 'drink'] as const;
 type GaitClip = (typeof GAIT_CLIPS)[number];
 type ActionClip = (typeof ACTION_CLIPS)[number] | (typeof GESTURE_CLIPS)[number];
 type PlayerClip = GaitClip | ActionClip | (typeof COMBAT_CLIPS)[number];
@@ -41,18 +41,18 @@ export interface AnimatedPlayer {
 const ease = (value: number) => value * value * (3 - 2 * value);
 const band = (low: number, high: number, value: number) => ease(Math.min(1, Math.max(0, (value - low) / (high - low))));
 
-function releaseModel(model: GLTF) {
+function releaseModel(model: GLTF, ownsMeshResources = true) {
   model.scene?.removeFromParent();
   const skeletons = new Set<Skeleton>();
   for (const scene of model.scenes) scene.traverse(object => {
     if (object instanceof SkinnedMesh) skeletons.add(object.skeleton);
   });
   for (const skeleton of skeletons) skeleton.dispose();
-  disposeGLTF(model);
+  if (ownsMeshResources) disposeGLTF(model);
 }
 
 /** Takes exclusive ownership of the loaded model and its GPU resources. */
-export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
+export function createAnimatedPlayer(model: GLTF, { ownsMeshResources = true } = {}): AnimatedPlayer {
   const root = model.scene;
   const clips = new Map(model.animations.map(clip => [clip.name, clip]));
   const actions = new Map<PlayerClip, AnimationAction>();
@@ -77,7 +77,7 @@ export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
     }
   } catch (error) {
     playerMixer?.stopAllAction().uncacheRoot(root);
-    releaseModel(model);
+    releaseModel(model, ownsMeshResources);
     throw error;
   }
 
@@ -227,7 +227,7 @@ export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
       mixer.uncacheRoot(root);
       actions.clear();
       layers = [];
-      releaseModel(model);
+      releaseModel(model, ownsMeshResources);
     },
   };
 }

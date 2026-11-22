@@ -22,6 +22,7 @@ interface ClimbingOptions {
   leapLinks: readonly TraversalLeapDefinition[];
   duration(clip: string): number;
   canInkStep?(): boolean;
+  onInkStep?(): void;
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
@@ -165,6 +166,7 @@ export function createTraversalController(
     if (air) state.airDashed = true;
     inkCooldown = tuning.inkRecharge;
     changeState(air ? 'DASH' : 'DODGE');
+    options?.onInkStep?.();
   }
 
   function stepInk(delta: number, action: NonNullable<typeof burst>) {

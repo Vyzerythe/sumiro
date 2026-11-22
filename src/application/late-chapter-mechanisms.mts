@@ -1,26 +1,36 @@
 import type { Object3D } from 'three/webgpu';
+import type { EncounterState } from '../combat/encounters.mts';
 import type { createRunProgress } from '../domain/run-progress.mts';
 import type { CollisionWorld } from '../physics/world.mts';
 import type { createTraversalController } from '../player/traversal-controller.mts';
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
 import { createChapterFiveMechanisms } from './chapter-five-mechanisms.mts';
+import { chapterFiveGateSites, createChapterFiveGates } from './chapter-five-gates.mts';
 import { createChapterFiveWater } from './chapter-five-water.mts';
+import { mountChapterFiveCurtains } from './chapter-five-curtains.mts';
 import { createChapterFourMechanisms } from './chapter-four-mechanisms.mts';
 import { bindChapterFourPresentation } from './chapter-four-presentation.mts';
 import { bindChapterThreeMechanismPresentation, createChapterThreeMechanisms } from './chapter-three-mechanisms.mts';
+import { bindChapterSixMechanismPresentation, createChapterSixMechanisms } from './chapter-six-mechanisms.mts';
 
 type Progress = ReturnType<typeof createRunProgress>;
 type Player = ReturnType<typeof createTraversalController>;
 type MechanismEvent = { type: 'cue'; name: string } | { type: 'hint'; text: string; ms: number } | { type: 'shake'; strength: number };
+interface MechanismEffects {
+  onEvent(event: MechanismEvent): void;
+  encounterState(id: string): EncounterState | undefined;
+  breakSwarm(id: string): void;
+}
 
 export interface LateChapterMechanisms {
   reset(): void;
+  inkStep?(): void;
   /** Returns true when the mechanism requires the player to respawn. */
-  step(delta: number, player: Player, attack: boolean, seconds: number): boolean;
+  step(frame: { delta: number; player: Player; attack: boolean; interact: boolean; seconds: number; cameraZ: number }): boolean;
 }
 
 export function mountLateChapterMechanisms(id: string, world: CollisionWorld, root: Object3D,
-  lifetime: ChapterLifetime, progress: Progress, onEvent: (event: MechanismEvent) => void,
+  lifetime: ChapterLifetime, progress: Progress, { onEvent, encounterState, breakSwarm }: MechanismEffects,
 ): LateChapterMechanisms | undefined {
   switch (id) {
     case 'ch3_pines': {
@@ -29,7 +39,7 @@ export function mountLateChapterMechanisms(id: string, world: CollisionWorld, ro
       const sync = bindChapterThreeMechanismPresentation(root, driver);
       return {
         reset() { driver.reset(); sync(); },
-        step(delta, player) {
+        step({ delta, player }) {
           const { x, y, z, carrier } = player.state;
           player.setDrift(driver.step(delta, { x, y, z, carrier }));
           sync();
@@ -39,13 +49,13 @@ export function mountLateChapterMechanisms(id: string, world: CollisionWorld, ro
     }
     case 'ch4_temple': {
       const driver = createChapterFourMechanisms(world, {
-        hasFlag: flag => Boolean(progress.current.flags[flag]), setFlag: flag => { progress.setFlag(flag); }, onEvent,
+        hasFlag: flag => Boolean(progress.current.flags[flag]), setFlag: flag => { progress.setFlag(flag); }, onEvent, encounterState,
       });
       lifetime.defer(() => driver.dispose());
       const sync = bindChapterFourPresentation(root, driver);
       return {
         reset() { driver.enter(progress.current); sync(); },
-        step(delta, { state }, attack) {
+        step({ delta, player: { state }, attack }) {
           if (attack && state.grounded) {
             const bell = driver.bells.find(target => Math.abs(target.y - state.y) < 2.1 &&
               Math.hypot(target.x - state.x, target.z - state.z) <= target.r + 0.6);
@@ -68,13 +78,48 @@ export function mountLateChapterMechanisms(id: string, world: CollisionWorld, ro
       });
       lifetime.defer(() => driver.dispose());
       driver.bind(scene, water.node);
+      const gates = createChapterFiveGates(world, {
+        hasFlag: flag => Boolean(progress.current.flags[flag]),
+        setFlag: flag => { progress.setFlag(flag); },
+        onCue: name => onEvent({ type: 'cue', name }),
+        onShake: strength => onEvent({ type: 'shake', strength }),
+        breakSwarm,
+      });
+      lifetime.defer(() => gates.dispose());
+      gates.bind(root, { onVeil: mountChapterFiveCurtains(root, lifetime) });
       return {
-        reset() { driver.reset(); fell = false; },
-        step(delta, { state }, _attack, seconds) {
+        reset() { driver.reset(); gates.reset(); fell = false; },
+        inkStep: gates.inkStep,
+        step({ delta, player: { state }, attack, interact, seconds, cameraZ }) {
           fell = false;
           driver.step(delta, { player: state, playing: true, seconds });
+          const court = encounterState('court');
+          gates.step(delta, { player: state, seconds, cameraZ, ...(court ? { court } : {}) });
+          const bell = chapterFiveGateSites.bell;
+          if ((attack || interact) && state.grounded && Math.abs(state.y - bell.standY) < 1.6 &&
+            Math.hypot(state.x - bell.x, state.z - bell.z) < bell.reach) gates.ringBell(attack ? 'strike' : 'interact');
           water.update(driver.presentation.seconds, driver.presentation.stir);
           return fell;
+        },
+      };
+    }
+    case 'ch6_summit': {
+      const driver = createChapterSixMechanisms(world, {
+        hasFlag: flag => Boolean(progress.current.flags[flag]), onEvent, encounterState,
+      });
+      lifetime.defer(() => driver.dispose());
+      const sync = bindChapterSixMechanismPresentation(root, driver);
+      return {
+        reset() { driver.reset(); sync(); },
+        inkStep: driver.inkStep,
+        step({ delta, player, attack }) {
+          const { state } = player;
+          const bell = driver.liftBell.definition;
+          if (attack && state.grounded && Math.abs(bell.y - state.y) < 2.1 &&
+            Math.hypot(bell.x - state.x, bell.z - state.z) <= bell.r + 0.6) driver.ringLiftBell();
+          player.setDrift(driver.step(delta, state));
+          sync();
+          return false;
         },
       };
     }

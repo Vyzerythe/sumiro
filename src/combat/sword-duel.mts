@@ -102,6 +102,7 @@ export type SwordDuelEvent =
 
 export interface SwordDuelEffects {
   random?(): number;
+  manualActivation?: boolean;
   onEvent?(event: SwordDuelEvent): void;
   /** Apply an attack or recoil displacement through the owning player controller. */
   movePlayer?(dx: number, dz: number, heading: number): SwordDuelPlayer | undefined;
@@ -145,7 +146,7 @@ const groundGait = new Set(['IDLE', 'WALK', 'RUN', 'SPRINT']);
 const E = swordWraithEncounter;
 
 /** Drive the one-player, one-wraith court encounter from fixed simulation steps. */
-export function createSwordDuel(world: DuelWorld, { random = Math.random, onEvent, movePlayer }: SwordDuelEffects = {}) {
+export function createSwordDuel(world: DuelWorld, { random = Math.random, onEvent, movePlayer, manualActivation = false }: SwordDuelEffects = {}) {
   const emit = (event: SwordDuelEvent) => onEvent?.(event);
   const cue = (name: string) => emit({ type: 'cue', name });
   const player = { action: 'IDLE' as PlayerAction, clip: null as PlayerClip | null, frame: 0, elapsed: 0, heading: 0,
@@ -472,7 +473,7 @@ export function createSwordDuel(world: DuelWorld, { random = Math.random, onEven
   function step(delta: number, pose: SwordDuelPlayer, input: SwordDuelInput = {}) {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Duel step must be finite and nonnegative');
     if (delta === 0 || input.playing === false) return;
-    if (phase === 'idle' && pose.grounded && pointInPolygon(pose.x, pose.z, E.start)) startEncounter(pose);
+    if (!manualActivation && phase === 'idle' && pose.grounded && pointInPolygon(pose.x, pose.z, E.start)) startEncounter(pose);
     if (phase === 'idle') return;
     const combatDelta = stop > 0 ? delta * HIT_STOP_SCALE : delta;
     stop = Math.max(0, stop - delta);
@@ -491,5 +492,8 @@ export function createSwordDuel(world: DuelWorld, { random = Math.random, onEven
     attackBuffer = parryBuffer = stop = invulnerable = knockX = knockZ = 0;
   }
 
-  return { get phase() { return phase; }, player: player as Readonly<typeof player>, enemy: enemy as Readonly<typeof enemy>, step, reset };
+  return {
+    get phase() { return phase; }, player: player as Readonly<typeof player>, enemy: enemy as Readonly<typeof enemy>, step, reset,
+    start(pose: SwordDuelPlayer) { if (phase === 'idle') startEncounter(pose); },
+  };
 }
