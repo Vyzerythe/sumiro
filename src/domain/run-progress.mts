@@ -1,5 +1,5 @@
 import { abilitiesAtChapter, findChapter, transitionToChapter, type ChapterAbilities } from './chapters.mts';
-import { createDefaultRun, loadSave, writeSave, type LoadedSave } from './save.mts';
+import { createDefaultRun, loadSave, writeSave, type LoadedSave, type RunOptions } from './save.mts';
 
 type RunStorage = Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>>;
 type Run = LoadedSave & {
@@ -45,6 +45,15 @@ export function createRunProgress(storage: RunStorage) {
     get current(): Readonly<Run> { return run; },
     get hasSave() { return hasSave; },
     save: persist,
+    setOptions(settings: Partial<RunOptions>, save = true) {
+      run.options = { ...run.options, ...settings };
+      return save ? persist() : true;
+    },
+    selectUnlockedChapter(id: string) {
+      if (!hasSave || switching || !run.unlocked.includes(id) || !findChapter(id)) return false;
+      transitionToChapter(run, id);
+      return true;
+    },
     tick(seconds: number) {
       if (!Number.isFinite(seconds) || seconds < 0) throw RangeError('Play time must be finite and nonnegative');
       run.playS += seconds;

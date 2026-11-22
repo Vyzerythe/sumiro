@@ -11,6 +11,10 @@
     [role="status"] { position: fixed; inset: auto 1rem 1rem; max-width: 50ch; padding: .8rem 1rem; background: #282623; white-space: pre-line; pointer-events: none; }
     .menu { position: fixed; inset: 0; display: grid; place-content: center; gap: .6rem; padding: 1rem; background: #26231fe8; }
     .menu[hidden] { display: none; }
+    .menu-fields { display: grid; gap: .6rem; max-height: 55vh; overflow: auto; padding: .2rem; }
+    .option-fields label { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(7rem, 1fr); gap: .8rem; align-items: center; }
+    .option-fields input[type="checkbox"] { justify-self: end; }
+    .controls-list { padding-inline-start: 1.25rem; margin: 0; line-height: 1.5; }
     h1, h2 { margin: 0 0 1rem; font: normal clamp(2.5rem, 9vw, 5rem) Georgia, serif; }
     button { padding: .7rem 1rem; color: inherit; background: #34302a; border: 1px solid #8d8272; font: inherit; }
     button:not(:disabled) { cursor: pointer; }
@@ -19,10 +23,13 @@
     #pause-button { position: fixed; inset: 1rem 1rem auto auto; }
     #vitals { position: fixed; inset: 1rem auto auto 1rem; pointer-events: none; filter: drop-shadow(0 0 .3rem #e7dcc1); }
     #vitals > div { display: flex; gap: .4rem; align-items: center; }
+    #vitals > div[hidden] { display: none; }
     #vitals img { width: auto; height: var(--icon-size); }
     #vitals .spent { opacity: .28; }
     .vital-strokes { --icon-size: 1.1rem; }
     .vital-drinks { --icon-size: 1.75rem; margin-top: .4rem; }
+    .vital-companion { margin-top: .4rem; color: #24201a; font-size: .85rem; }
+    .vital-companion meter { width: 5rem; height: .65rem; }
     #credits { position: fixed; inset: 0; overflow: hidden; text-align: center; background: #11100e; color: #e7dcc1; font: italic clamp(1rem, 2.7vh, 1.65rem)/1.55 Georgia, serif; }
     #credits h2 { margin: 2.5rem 0 .5rem; font: normal .85em Georgia, serif; letter-spacing: .13em; text-transform: uppercase; }
     #credits p { margin: .35rem 0; }
@@ -51,6 +58,9 @@
     <h1 id="game-title">Sumiro</h1>
     <button type="button" id="continue">Continue</button>
     <button type="button" id="new-run">New game</button>
+    <button type="button" id="select-chapter" hidden>Chapters</button>
+    <button type="button" id="title-options">Options</button>
+    <button type="button" id="title-controls">Controls</button>
   </section>
   <div id="vitals" role="group" hidden></div>
   <button type="button" id="pause-button" hidden>Pause</button>
@@ -58,7 +68,34 @@
     <h2 id="pause-heading">Paused</h2>
     <button type="button" id="resume">Resume</button>
     <button type="button" id="restart-checkpoint">Restart from shrine</button>
+    <button type="button" id="pause-options">Options</button>
+    <button type="button" id="pause-controls">Controls</button>
     <button type="button" id="return-to-title">Quit to title</button>
+  </section>
+  <section class="menu" id="chapters-menu" aria-labelledby="chapters-heading" hidden>
+    <h2 id="chapters-heading">Chapters</h2>
+    <div class="menu-fields" id="unlocked-chapters"></div>
+    <button type="button" data-page-back>Back</button>
+  </section>
+  <section class="menu" id="options-menu" aria-labelledby="options-heading" hidden>
+    <h2 id="options-heading">Options</h2>
+    <div class="menu-fields option-fields" id="options-fields"></div>
+    <button type="button" data-page-back>Back</button>
+  </section>
+  <section class="menu" id="controls-menu" aria-labelledby="controls-heading" hidden>
+    <h2 id="controls-heading">Controls</h2>
+    <ul class="controls-list">
+      <li>WASD or arrows to move, C to walk</li>
+      <li>Space to jump, leap, or climb</li>
+      <li>On a ledge, W to climb, A and D to shimmy, S to let go</li>
+      <li>Space with A, D, or S to leap while hanging</li>
+      <li>E to rest at a shrine or take a scroll, R to drink</li>
+      <li>F to pick up or set down the cat</li>
+      <li>Shift for Ink Step once learned</li>
+      <li>J or left click to strike, K or right click to parry</li>
+      <li>P or Escape to pause</li>
+    </ul>
+    <button type="button" data-page-back>Back</button>
   </section>
   <p role="status" hidden></p>
   <section id="credits" aria-label="Credits" hidden>

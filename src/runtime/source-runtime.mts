@@ -2,6 +2,7 @@ import { PerspectiveCamera, type Camera, type Object3D, type Scene } from 'three
 import { createAssetManager, type AssetManager, type AssetManagerOptions } from '../assets/asset-manager.mts';
 import { createAudioMixer, type AudioMixer, type AudioMixerContext, type AudioMixerOptions, type AudioVolumes } from '../audio/audio-mixer.mts';
 import type { RunVitalsSnapshot } from '../domain/run-vitals.mts';
+import type { CompanionPhase } from '../domain/companion-risk.mts';
 import { createInputManager, type InputManager, type InputManagerOptions } from '../input/input-manager.mts';
 import { createWebGpuSurface } from '../rendering/webgpu-renderer.mts';
 import { FixedStepClock, SimulationTimeReader } from './fixed-step-clock.mts';
@@ -20,6 +21,7 @@ interface RuntimeValues extends Record<string, unknown> {
   'game.paused': boolean;
   'game.completed': boolean;
   'game.vitals': RunVitalsSnapshot;
+  'companion.state': { phase: CompanionPhase; found: boolean; health: number; maxHealth: number };
   'chapter.prompt': string | null;
   'audio.duck': boolean;
 }

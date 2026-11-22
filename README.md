@@ -10,7 +10,7 @@ npm run build:source
 python3 -m http.server 8000
 ```
 
-Open [the native game](http://localhost:8000/.local-build-source/) in a WebGPU-capable browser. The title menu starts a new run or resumes a stored checkpoint. Native sessions use their own save slot and can read the shipped save formats. See [Development and validation](docs/DEVELOPMENT.md) for controls and the hardware test.
+Open [the native game](http://localhost:8000/.local-build-source/) in a WebGPU-capable browser. The title menu starts a new run, resumes a checkpoint, or replays an unlocked chapter. The title and pause menus expose controls and options. Native sessions use their own save slot and can read the shipped save formats. See [Development and validation](docs/DEVELOPMENT.md) for the hardware test.
 
 The native application has all six chapter worlds, authored traversal and cameras, combat, shrines, collectible scrolls, and progression through the ending. The checks cover connected routes and separate checkpoint approaches. A continuous six-chapter run and detailed audiovisual parity are still open.
 

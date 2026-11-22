@@ -84,6 +84,7 @@ export async function loadCompanionPresentation(assets: AssetManager, lifetime: 
   }
   const companion = rig(root, lifetime);
   const spare = new Vector3();
+  let reaction: AnimationAction | undefined;
   function shoulderPosition(output: Vector3) {
     if (mount) return mount.getWorldPosition(output).add(spare.set(0, 0.06, 0));
     return output.copy(player.position).add(spare.set(0, 1.4, 0));
@@ -99,6 +100,9 @@ export async function loadCompanionPresentation(assets: AssetManager, lifetime: 
       return rig(model, owner);
     },
     shoulderPosition,
+    flinch(clip: 'hurt' | 'meow') {
+      reaction = companion.play(clip, .12, { loop: false, restart: true });
+    },
     update(state: CompanionState, delta: number, inkLearned: boolean) {
       root.visible = true;
       const carried = state.phase === 'CARRIED';
@@ -106,7 +110,10 @@ export async function loadCompanionPresentation(assets: AssetManager, lifetime: 
         state.phase === 'WAIT_GAP' || state.phase === 'SIT' || state.phase === 'REUNITED' ? 'sit' :
           state.speed > 2.2 ? 'run' : state.speed > 0.15 ? 'walk' : 'idle';
       const nativeSpeed = clipName === 'walk' ? 0.9 : clipName === 'run' ? 4.875 : 0;
-      companion.play(clipName, 0.18, { speed: nativeSpeed ? Math.min(2.75, Math.max(0.3, state.speed / nativeSpeed)) : 1 });
+      if (!reaction || reaction.paused || carried) {
+        reaction = undefined;
+        companion.play(clipName, 0.18, { speed: nativeSpeed ? Math.min(2.75, Math.max(0.3, state.speed / nativeSpeed)) : 1 });
+      }
       companion.advance(delta);
       if (carried) root.position.copy(shoulderPosition(anchor));
       else root.position.set(state.x, state.y, state.z);

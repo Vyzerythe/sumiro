@@ -8,6 +8,7 @@ import { configureInkSurfacePass } from './ink-surface-pass.mts';
 import { INK_PAPER_BASE, createInkSurfaceSky, createInkWashSheet, type InkWashSheet } from './ink-surface-sky.mts';
 import { createSeaShoreline, type SeaShorelineInputs } from './sea-shoreline.mts';
 import { blendSeaReflection, createSeaReflectionPass } from './sea-reflection.mts';
+import { blendSummitAtmosphere, mountSummitAtmosphere } from './summit-atmosphere.mts';
 import { textureSize2D } from './texture-size.mts';
 import type { WebGpuOutputGraph } from './webgpu-renderer.mts';
 
@@ -16,6 +17,7 @@ type InkSettings = NonNullable<Parameters<typeof createInkComposite>[2]> & {
   background?: { scene: Scene; camera: PerspectiveCamera | OrthographicCamera; enabled: Node<'bool'> };
   washSheets?: readonly (Omit<InkWashSheet, 'noise'> & { controls?: InkWashControls })[];
   sea?: Omit<SeaShorelineInputs, 'depth' | 'noise'> & { enabled: Node<'bool'>; reflection?: boolean };
+  summit?: Node<'bool'>;
   noiseSeed?: number;
 };
 
@@ -34,9 +36,17 @@ export function createInkRenderGraph(
   let volume: ReturnType<typeof createInkNoiseTexture> | undefined;
   let seaReflection: ReturnType<typeof createSeaReflectionPass> | undefined;
   let backgroundPass: PassNode | undefined;
+  let summitAtmosphere: ReturnType<typeof mountSummitAtmosphere> | undefined;
+  function disposeLayers() {
+    try { seaReflection?.dispose(); } finally {
+      try { backgroundPass?.dispose(); } finally {
+        try { summitAtmosphere?.dispose(); } finally { volume?.dispose(); }
+      }
+    }
+  }
   try {
     let layer = createInkComposite({ ...attachments, edge }, camera, settings);
-    if (settings.paper || settings.washSheets?.length || settings.sea) {
+    if (settings.paper || settings.washSheets?.length || settings.sea || settings.summit) {
       volume = createInkNoiseTexture(settings.noiseSeed);
       const noise = texture3D(volume);
       if (settings.paper) layer = createInkSurfaceSky(layer, attachments.depth, camera, { noise, ...settings.paper });
@@ -57,6 +67,18 @@ export function createInkRenderGraph(
       }
       for (const { controls, ...sheet } of settings.washSheets ?? []) {
         layer = createInkWashSheet(layer, attachments.depth, camera, { noise, ...sheet }, controls);
+      }
+      if (settings.summit) {
+        const enabled = settings.summit;
+        const summit = mountSummitAtmosphere(camera, attachments.depth, noise);
+        summitAtmosphere = summit;
+        summit.setEnabled(false);
+        const base = layer;
+        layer = Fn(() => {
+          const result = base.toVar();
+          If(enabled, () => { result.assign(blendSummitAtmosphere(result, summit.texture)); });
+          return result;
+        })();
       }
     }
     const background = settings.background;
@@ -83,37 +105,31 @@ export function createInkRenderGraph(
       const outputNode = createInkGrade(composite);
       let disposed = false;
       return {
-        attachments, edge, composite, outputNode, seaReflection,
+        attachments, edge, composite, outputNode, seaReflection, summitAtmosphere,
         setResolutionScale(scale: number) {
           edge.setResolutionScale(scale);
           composite.setResolutionScale(scale);
           seaReflection?.setResolutionScale(scale);
           backgroundPass?.setResolutionScale(scale);
+          summitAtmosphere?.setResolutionScale(scale);
         },
         dispose() {
           if (disposed) return;
           disposed = true;
           try { composite.dispose(); } finally {
-            try { edge.dispose(); } finally {
-              try { seaReflection?.dispose(); } finally {
-                try { backgroundPass?.dispose(); } finally { volume?.dispose(); }
-              }
-            }
+            try { edge.dispose(); } finally { disposeLayers(); }
           }
         },
       } satisfies WebGpuOutputGraph & {
         attachments: typeof attachments; edge: typeof edge; composite: typeof composite; seaReflection: typeof seaReflection;
+        summitAtmosphere: typeof summitAtmosphere;
       };
     } catch (error) {
       composite.dispose();
       throw error;
     }
   } catch (error) {
-    try { edge.dispose(); } finally {
-      try { seaReflection?.dispose(); } finally {
-        try { backgroundPass?.dispose(); } finally { volume?.dispose(); }
-      }
-    }
+    try { edge.dispose(); } finally { disposeLayers(); }
     throw error;
   }
 }

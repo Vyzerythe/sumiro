@@ -1,10 +1,12 @@
 import { createRunProgress } from '../domain/run-progress.mts';
 import { createNativeSaveStorage } from '../domain/native-save-storage.mts';
+import { createNativePreferencesStorage, type NativePreferences } from '../domain/native-preferences.mts';
 import { createDefaultRun, saveKey } from '../domain/save.mts';
 import { createChapterPreview } from './chapter-preview.mts';
 import { createCredits } from './credits.mts';
 import { createCreditsView } from './credits-view.mts';
 import { createVitalsView } from './vitals-view.mts';
+import { createOptionsView, renderChapterMenu } from './native-menu-pages.mts';
 import { createTraversalPreview } from './traversal-preview.mts';
 
 function element<Kind extends Element>(selector: string): Kind {
@@ -25,6 +27,11 @@ const restartButton = element<HTMLButtonElement>('#restart-checkpoint');
 const returnButton = element<HTMLButtonElement>('#return-to-title');
 const advanceCredits = element<HTMLButtonElement>('#advance-credits');
 const vitalsRoot = element<HTMLElement>('#vitals');
+const chaptersButton = element<HTMLButtonElement>('#select-chapter');
+const chaptersMenu = element<HTMLElement>('#chapters-menu');
+const chapterButtons = element<HTMLElement>('#unlocked-chapters');
+const optionsMenu = element<HTMLElement>('#options-menu');
+const controlsMenu = element<HTMLElement>('#controls-menu');
 
 function viewport(element: HTMLCanvasElement) {
   return {
@@ -42,19 +49,54 @@ type Game = Awaited<ReturnType<typeof createTraversalPreview>>;
 type Runtime = Game | Awaited<ReturnType<typeof createChapterPreview>>;
 let runtime: Runtime | undefined;
 let game: Game | undefined;
+let activeProgress: ReturnType<typeof createRunProgress> | undefined;
+let menuPage: { root: HTMLElement; owner: HTMLElement; trigger: HTMLElement } | undefined;
+let shownPreferences: NativePreferences | undefined;
 let stopInterface: (() => void) | undefined;
 let starting = false;
 let closing: Promise<void> | undefined;
 
 const directPreview = query.get('walk') === '1';
 const nativeStorage = createNativeSaveStorage(() => localStorage);
+const preferences = createNativePreferencesStorage(() => localStorage);
 const progressStorage = directPreview ? { getItem: nativeStorage.getItem } : nativeStorage;
 const readProgress = () => createRunProgress(progressStorage);
 const credits = createCreditsView(element<HTMLElement>('#credits'), advanceCredits, returnToTitle);
 const vitals = createVitalsView(vitalsRoot, assetBaseURL);
+const showSettings = createOptionsView(element<HTMLElement>('#options-fields'), settings => {
+  shownPreferences = settings;
+  activeProgress?.setOptions(settings, false);
+  game?.context.registry.set('game.options', settings);
+}, () => {
+  if (!shownPreferences || directPreview) return;
+  preferences.write(shownPreferences);
+  activeProgress?.save();
+});
+
+function showMenuPage(root: HTMLElement, trigger: HTMLElement, initial?: HTMLElement | null) {
+  const owner = game ? pauseMenu : title;
+  owner.hidden = true;
+  root.hidden = false;
+  menuPage = { root, owner, trigger };
+  (initial ?? root.querySelector<HTMLElement>('button'))?.focus();
+}
+
+function closeMenuPage(restore = true) {
+  if (!menuPage) return;
+  const { root, owner, trigger } = menuPage;
+  menuPage = undefined;
+  root.hidden = true;
+  if (restore) {
+    owner.hidden = false;
+    trigger.focus();
+  }
+}
 
 function showTitle() {
-  continueButton.disabled = !readProgress().hasSave;
+  closeMenuPage(false);
+  const available = readProgress();
+  continueButton.disabled = !available.hasSave;
+  chaptersButton.hidden = !available.hasSave || available.current.unlocked.length <= 1;
   startButton.disabled = false;
   title.hidden = false;
   (continueButton.disabled ? startButton : continueButton).focus();
@@ -128,8 +170,9 @@ function presentGame(current: Game, progress: ReturnType<typeof createRunProgres
     credits.show(createCredits(progress.current));
   });
   const showVitals = current.context.registry.on('game.vitals', vitals.draw);
+  const showCompanion = current.context.registry.on('companion.state', vitals.companion);
   stopInterface = () => {
-    unsubscribe(); unpause(); activeScene(); sceneSubtitle(); laterPrompt(); completed(); showVitals();
+    unsubscribe(); unpause(); activeScene(); sceneSubtitle(); laterPrompt(); completed(); showVitals(); showCompanion();
     window.clearTimeout(notice);
     credits.reset();
   };
@@ -139,6 +182,8 @@ function closeSession() {
   if (closing) return closing;
   const previous = runtime;
   runtime = game = undefined;
+  activeProgress = undefined;
+  closeMenuPage(false);
   stopInterface?.();
   stopInterface = undefined;
   vitalsRoot.hidden = pauseButton.hidden = pauseMenu.hidden = status.hidden = true;
@@ -150,9 +195,10 @@ function returnToTitle() {
   void closeSession().then(() => { if (!page.signal.aborted) showTitle(); }, displayError);
 }
 
-async function launch(kind: 'new' | 'continue' | 'geometry') {
+async function launch(kind: 'new' | 'continue' | 'geometry' | 'chapter', chapterId?: string) {
   if (starting || closing || runtime || page.signal.aborted) return;
   starting = true;
+  closeMenuPage(false);
   title.hidden = true;
   status.hidden = false;
   status.textContent = 'Loading chapter…';
@@ -165,17 +211,21 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
       runtime = await createChapterPreview({ ...options, ...(chapter ? { chapter } : {}) });
     } else {
       const previous = readProgress();
-      const fresh = createDefaultRun(previous.current.options);
-      const progress = kind === 'continue' ? previous : createRunProgress({
+      const settings = preferences.read(previous.current.options);
+      const fresh = createDefaultRun({ ...previous.current.options, ...settings });
+      const progress = kind !== 'new' ? previous : createRunProgress({
         ...progressStorage, getItem: key => key === saveKey ? JSON.stringify(fresh) : null,
       });
+      if (kind === 'chapter' && (!chapterId || !progress.selectUnlockedChapter(chapterId))) throw Error('That chapter is still locked.');
+      progress.setOptions(settings, false);
       run = progress;
-      if (kind === 'new' && !directPreview) newRun = progress;
+      if (kind !== 'continue' && !directPreview) newRun = progress;
       game = await createTraversalPreview({ ...options, progress,
         input: { keyboardTarget: canvas, pointerTarget: canvas, blurTarget: window, getGamepads: () => navigator.getGamepads() },
         audio: { createContext: () => new AudioContext(), gestureTarget: window, visibilityTarget: document },
       });
       runtime = game;
+      activeProgress = progress;
     }
     if (page.signal.aborted) { await closeSession(); return; }
     runtime.render();
@@ -206,11 +256,32 @@ startButton.addEventListener('click', () => {
   if (directPreview || !readProgress().hasSave || window.confirm('Begin a new native run?')) void launch('new');
 }, listen);
 continueButton.addEventListener('click', () => { void launch('continue'); }, listen);
+chaptersButton.addEventListener('click', () => {
+  const unlocked = readProgress().current.unlocked;
+  const first = renderChapterMenu(chapterButtons, unlocked, id => { void launch('chapter', id); });
+  showMenuPage(chaptersMenu, chaptersButton, first);
+}, listen);
+for (const prefix of ['title', 'pause'] as const) {
+  const optionsButton = element<HTMLButtonElement>(`#${prefix}-options`);
+  optionsButton.addEventListener('click', () => {
+    const fallback = activeProgress?.current.options ?? readProgress().current.options;
+    shownPreferences = directPreview && shownPreferences ? shownPreferences : preferences.read(fallback);
+    showSettings(shownPreferences);
+    showMenuPage(optionsMenu, optionsButton, optionsMenu.querySelector('input'));
+  }, listen);
+  const controlsButton = element<HTMLButtonElement>(`#${prefix}-controls`);
+  controlsButton.addEventListener('click', () => showMenuPage(controlsMenu, controlsButton), listen);
+}
+for (const back of document.querySelectorAll<HTMLButtonElement>('[data-page-back]')) {
+  back.addEventListener('click', () => closeMenuPage(), listen);
+}
 pauseButton.addEventListener('click', () => game?.setPaused(true), listen);
 resumeButton.addEventListener('click', () => game?.setPaused(false), listen);
 restartButton.addEventListener('click', () => game?.restartFromCheckpoint(), listen);
 window.addEventListener('keydown', event => {
-  if (event.code === 'Escape' && game?.context.paused && event.target !== canvas && !event.repeat) game.setPaused(false);
+  if (event.code !== 'Escape' || event.repeat) return;
+  if (menuPage) { event.preventDefault(); closeMenuPage(); }
+  else if (game?.context.paused && event.target !== canvas) game.setPaused(false);
 }, listen);
 returnButton.addEventListener('click', returnToTitle, listen);
 advanceCredits.addEventListener('click', credits.advance, listen);

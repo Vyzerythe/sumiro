@@ -8,6 +8,10 @@ import type { SwordDuelInput } from '../combat/sword-duel.mts';
 import { chapters } from '../domain/chapters.mts';
 import type { createRunProgress } from '../domain/run-progress.mts';
 import type { StrokePool } from '../domain/run-vitals.mts';
+import {
+  chooseArcherTarget, companionMeleeHits, companionProvocationSeconds, resolveCompanionPressure, updateWraithTarget,
+  type CompanionRiskFrame, type WraithTargetState, type createCompanionRisk,
+} from '../domain/companion-risk.mts';
 import type { CollisionWorld } from '../physics/world.mts';
 import type { AnimatedPlayer } from '../player/animated-player.mts';
 import type { createTraversalController } from '../player/traversal-controller.mts';
@@ -24,6 +28,7 @@ interface CombatOptions {
   player: ReturnType<typeof createTraversalController>;
   progress: ReturnType<typeof createRunProgress>;
   health: StrokePool;
+  companion?: { frame(): CompanionRiskFrame; risk: ReturnType<typeof createCompanionRisk> };
   duration: AnimatedPlayer['duration'];
   random?: () => number;
   onCue(name: string): void;
@@ -36,11 +41,13 @@ interface ActiveActor {
   ticket: EncounterTicket;
   elapsed: number;
   lastClip: string;
+  pressure: number;
+  threat: WraithTargetState;
 }
 
 /** Own one player combat state, an authored wave controller, and the stage's opponents. */
 export async function loadEncounterCombat({
-  id, assets, lifetime, world, root, progress, health, player, duration, random, onCue, onHint,
+  id, assets, lifetime, world, root, progress, health, companion, player, duration, random, onCue, onHint,
 }: CombatOptions) {
   const chapterNumber = chapters.findIndex(chapter => chapter.id === id) + 1;
   const definition = chapterCombat[chapterNumber as 1 | 2 | 3 | 4 | 5 | 6];
@@ -58,6 +65,7 @@ export async function loadEncounterCombat({
     strike(target, cut, combo, origin) {
       const actor = actors.get(target.id);
       if (actor) {
+        actor.threat.provoked = companionProvocationSeconds;
         const result = actor.enemy.damage({ dmg: cut.dmg, x: origin.x, z: origin.z,
           ...(combo === 'riposte' ? { riposte: true } : { combo }) });
         return result === 'hit' || result === 'dead';
@@ -83,6 +91,28 @@ export async function loadEncounterCombat({
     actor.visual.dispose();
   }
 
+  function visible(from: Readonly<{ x: number; y: number; z: number }>, to: Readonly<{ x: number; y: number; z: number }>, height: number) {
+    const y = from.y + 1.4;
+    const dx = to.x - from.x, dy = to.y + height - y, dz = to.z - from.z;
+    const distance = Math.hypot(dx, dy, dz);
+    return distance === 0 || world.raycast(from.x, y, from.z, dx / distance, dy / distance, dz / distance, distance, 3) >= distance;
+  }
+
+  function targetFor(actor: ActiveActor, cat: CompanionRiskFrame['position'] | undefined, delta: number) {
+    const { enemy, threat, pressure } = actor;
+    const pose = enemy.state;
+    if (pose.kind === 'ronin') return player.state;
+    let hunters = 0;
+    for (const other of actors.values()) if (other !== actor && other.enemy.state.alive && other.threat.target === 'cat') hunters++;
+    if (pose.kind === 'wraith') {
+      actor.threat = updateWraithTarget(threat, { enemy: pose, player: player.state, ...(cat ? { cat } : {}), pressure, hunters }, delta);
+    } else {
+      actor.threat.target = cat ? chooseArcherTarget({ current: threat.target, enemy: pose, cat,
+        playerVisible: visible(pose, player.state, 1.1), catVisible: visible(pose, cat, .22), pressure, hunters }) : 'player';
+    }
+    return actor.threat.target === 'cat' && cat ? { ...cat, aimHeight: .22 } : player.state;
+  }
+
   const controller = createEncounterController(records, {
     hasFlag: flag => Boolean(progress.current.flags[flag]),
     setFlag: flag => { progress.setFlag(flag); },
@@ -93,13 +123,26 @@ export async function loadEncounterCombat({
       release(entry.id);
       const visual = makeVisual(entry.id, entry.kind);
       try {
-        const tempo = records.find(encounter => encounter.id === ticket.encounter)?.tempo ?? definition.tempo;
+        const record = records.find(encounter => encounter.id === ticket.encounter);
+        const tempo = record?.tempo ?? definition.tempo;
+        const pressure = resolveCompanionPressure(definition.catPressure, record?.catPressure);
         const enemy = createEncounterEnemy(entry, {
           world, tempo, ...(random ? { random } : {}),
           mayAttack: state => state.kind === 'archer' || ![...actors.values()].some(other => other.enemy.state !== state &&
             other.enemy.state.kind !== 'archer' && other.enemy.state.state === 'MOVE'),
           onAttack(attack) {
-            if (attack.type === 'melee') return sword.receive(player.state, attack.origin, attack.dmg, attack.parryable) ?? 'miss';
+            if (attack.type === 'melee') {
+              const actor = actors.get(entry.id);
+              const { origin, heading, reach, arc, dmg, parryable } = attack;
+              const playerInArc = companionMeleeHits(origin, heading, reach + .06, arc, player.state);
+              const outcome = actor?.threat.target !== 'cat' || playerInArc
+                ? sword.receive(player.state, origin, dmg, parryable) : undefined;
+              const frame = companion?.frame();
+              if (outcome !== 'parried' && frame && companionMeleeHits(origin, heading, reach, arc, frame.position)) {
+                if (companion?.risk.damage(frame, dmg, origin)) return 'hit';
+              }
+              return outcome ?? 'miss';
+            }
             projectiles.launch(attack);
           },
           onEvent(event) {
@@ -109,7 +152,8 @@ export async function loadEncounterCombat({
           },
         });
         root.add(visual.root);
-        actors.set(entry.id, { enemy, visual, ticket, elapsed: 0, lastClip: '' });
+        actors.set(entry.id, { enemy, visual, ticket, elapsed: 0, lastClip: '', pressure,
+          threat: { target: 'player', targetTime: 0, provoked: 0 } });
         return () => { if (lifetime.signal.aborted || enemy.state.alive) release(entry.id); };
       } catch (error) {
         visual.dispose();
@@ -143,8 +187,10 @@ export async function loadEncounterCombat({
       if (enabled) sword.step(delta, player.state, input, true);
       else if (sword.state.action !== 'IDLE') sword.reset(sword.state.strokes);
       const down = sword.state.action === 'DEATH';
+      const frame = companion?.frame();
+      const cat = frame && companion?.risk.targetable(frame) ? frame.position : undefined;
       for (const actor of actors.values()) {
-        actor.enemy.step(delta, player.state, enabled && !down);
+        actor.enemy.step(delta, targetFor(actor, cat, delta), enabled && !down);
         // A dissolved callback can remove the rig during the update.
         const { enemy, visual } = actor;
         if (!actors.has(enemy.state.id)) continue;
@@ -157,7 +203,8 @@ export async function loadEncounterCombat({
         visual.update({ ...state, y: state.y + state.yOffset, frame, visible: true }, delta);
       }
       for (const swarm of swarms) swarm.step(delta, seconds, { ...player.state, down });
-      projectiles.step(delta, player.state, attack => { sword.receive(player.state, attack.origin, attack.dmg, attack.parryable); });
+      projectiles.step(delta, player.state, attack => { sword.receive(player.state, attack.origin, attack.dmg, attack.parryable); },
+        cat && frame && companion ? { position: cat, onStrike(attack) { companion.risk.damage(frame, attack.dmg, attack.origin); } } : undefined);
     },
   };
 }

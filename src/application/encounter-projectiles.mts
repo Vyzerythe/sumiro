@@ -1,5 +1,6 @@
 import { BoxGeometry, Mesh, MeshBasicNodeMaterial, Vector3, type Object3D } from 'three/webgpu';
 import type { EnemyAttack } from '../combat/encounter-enemy.mts';
+import { companionArrowHits } from '../domain/companion-risk.mts';
 import type { CollisionPosition, CollisionWorld } from '../physics/world.mts';
 
 type Shot = Exclude<EnemyAttack, { type: 'melee' }>;
@@ -36,7 +37,10 @@ export function createEncounterProjectiles(world: CollisionWorld, root: Object3D
     launched.push({ attack, mesh, direction: axis, position: base, remaining: attack.type === 'arrow' ? 85 : attack.length });
   }
 
-  function step(delta: number, player: CollisionPosition, onStrike: (attack: Shot) => void) {
+  function step(delta: number, player: CollisionPosition, onStrike: (attack: Shot) => void, companion?: {
+    position: Readonly<CollisionPosition>;
+    onStrike(attack: Shot): void;
+  }) {
     if (delta <= 0) return;
     for (let index = launched.length - 1; index >= 0; index--) {
       const shot = launched[index]!;
@@ -50,9 +54,16 @@ export function createEncounterProjectiles(world: CollisionWorld, root: Object3D
       target.addScaledVector(axis, -closestAlong);
       const radius = attack.type === 'arrow' ? 0.58 : attack.width / 2 + 0.3;
       const hit = target.lengthSq() < radius ** 2 && (obstacle === Infinity || projected < obstacle);
-      if (hit) onStrike(attack);
+      const cat = companion?.position;
+      const catTravel = Math.min(travel, obstacle, hit ? Math.max(0, closestAlong) : Infinity);
+      const catHit = cat && attack.type === 'arrow' && catTravel > 0 && companionArrowHits({
+        x: position.x + axis.x * catTravel, y: position.y + axis.y * catTravel, z: position.z + axis.z * catTravel,
+        vx: axis.x, vy: axis.y, vz: axis.z,
+      }, cat, catTravel);
+      if (catHit) companion.onStrike(attack);
+      else if (hit) onStrike(attack);
       shot.remaining -= travel;
-      if (hit || obstacle < Infinity || shot.remaining <= 0) {
+      if (hit || catHit || obstacle < Infinity || shot.remaining <= 0) {
         mesh.removeFromParent();
         launched.splice(index, 1);
       } else {

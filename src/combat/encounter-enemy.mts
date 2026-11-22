@@ -1,6 +1,7 @@
 import type { EncounterSpawn } from './encounters.mts';
 
 interface Position { x: number; y: number; z: number }
+interface EnemyTarget extends Position { aimHeight?: number }
 type EnemyKind = EncounterSpawn['kind'];
 type EnemyState = 'RISE' | 'IDLE' | 'CHASE' | 'MOVE' | 'DRAW' | 'LOOSED' | 'STAGGER' | 'SIDESTEP' | 'BREATH_STEP' | 'BREATH' | 'DEAD';
 type AttackResult = 'hit' | 'miss' | 'dodged' | 'parried';
@@ -360,19 +361,19 @@ export function createEncounterEnemy(spawn: EncounterSpawn, options: EnemyOption
     }
   }
 
-  function aimAt(player: Position, dt: number) {
+  function aimAt(player: EnemyTarget, dt: number) {
     turn(distance(player).heading, 6, dt);
-    aim = { x: player.x, y: player.y + 1.15, z: player.z };
+    aim = { x: player.x, y: player.y + (player.aimHeight ?? 1.15), z: player.z };
   }
 
-  function visible(player: Position) {
+  function visible(player: EnemyTarget) {
     if (!world) return true;
-    const dx = player.x - state.x, dy = player.y + 1.1 - (state.y + 1.4), dz = player.z - state.z;
+    const dx = player.x - state.x, dy = player.y + (player.aimHeight ?? 1.1) - (state.y + 1.4), dz = player.z - state.z;
     const length = Math.hypot(dx, dy, dz) || 1;
     return world.raycast(state.x, state.y + 1.4, state.z, dx / length, dy / length, dz / length, length) >= length;
   }
 
-  function chase(dt: number, player: Position) {
+  function chase(dt: number, player: EnemyTarget) {
     const { dx, dz, length, heading } = distance(player);
     cooldown -= dt;
     const ready = cooldown <= 0;
@@ -446,7 +447,7 @@ export function createEncounterEnemy(spawn: EncounterSpawn, options: EnemyOption
     transition(phaseBreak ? 'BREATH_STEP' : 'SIDESTEP');
   }
 
-  function step(dt: number, player: Position | undefined, playing = true) {
+  function step(dt: number, player: EnemyTarget | undefined, playing = true) {
     if (disposed || !Number.isFinite(dt) || dt <= 0) return;
     target = player;
     age += dt;
