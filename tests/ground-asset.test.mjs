@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { decodeGroundAsset, installGroundAsset, sampleGroundEdgeHeight } from '../src/physics/ground-asset.mts';
 import { createCollisionWorld } from '../src/physics/world.mts';
 import { createInputManager } from '../src/input/input-manager.mts';
-import { createGroundTraversal } from '../src/player/ground-traversal.mts';
+import { createTraversalController } from '../src/player/traversal-controller.mts';
 import { FixedStepClock } from '../src/runtime/fixed-step-clock.mts';
 import { chapterOneGroundRegions, chapterOneSpawn } from '../src/application/chapter-one-terrain.mts';
 import { r as publishedPointInPolygon, t as createPublishedWorld } from '../sumiro/bundle/collision-DtBQEpmQ.js';
@@ -94,7 +94,7 @@ test('truncated and oversized assets leave existing collision state intact', () 
 test('sampled keyboard input walks the recovered terrain from the published spawn', context => {
   const world = createCollisionWorld();
   installGroundAsset(world, asset, chapterOneGroundRegions);
-  const body = createGroundTraversal(world, chapterOneSpawn);
+  const body = createTraversalController(world, chapterOneSpawn);
   const keyboard = new EventTarget();
   const input = createInputManager({ keyboardTarget: keyboard });
   context.after(() => input.dispose());

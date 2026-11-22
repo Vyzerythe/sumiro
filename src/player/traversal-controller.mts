@@ -1,32 +1,35 @@
 import type { InputManager } from '../input/input-manager.mts';
 import type { CapsuleHit, CollisionWorld } from '../physics/world.mts';
 import { updateInputSteering, type SteeringState } from './input-steering.mts';
-import { classifyGroundGait } from './locomotion.mts';
-import { stepGroundContact, type GroundContactState, type GroundContactEffects } from './motion-physics.mts';
+import { beginFall, beginJump, classifyGroundGait, type JumpState } from './locomotion.mts';
+import {
+  finishLanding, stepAirborne, stepGroundContact, type AirborneState,
+  type GroundContactState, type GroundContactEffects, type LandingState,
+} from './motion-physics.mts';
 import { movementConfig as tuning } from './movement-config.mjs';
 
-interface TraversalState extends GroundContactState, SteeringState {
-  heading: number;
-  speed: number;
-  stateT: number;
-}
+type TraversalState = GroundContactState & SteeringState & AirborneState & LandingState & JumpState;
 
-type WalkingInput = Pick<InputManager, 'forward' | 'strafe' | 'jump' | 'walk' | 'sprint'>;
+type TraversalInput = Pick<InputManager, 'forward' | 'strafe' | 'jump' | 'jumpHeld' | 'walk' | 'sprint'>;
 type View = Parameters<typeof updateInputSteering<string>>[2];
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const wrapAngle = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
 
-/** Standing and grounded movement. A loss of support returns control to the caller. */
-export function createGroundTraversal(world: CollisionWorld, spawn: Readonly<{ x: number; z: number; heading: number }>) {
+/** Fixed-step locomotion, takeoff and landing against one collision world. */
+export function createTraversalController(world: CollisionWorld, spawn: Readonly<{ x: number; z: number; heading: number }>) {
   const ground = world.groundAt(spawn.x, spawn.z);
   if (!ground) throw Error('Traversal spawn has no ground support');
   const state: TraversalState = {
     ...spawn, y: ground.y, lastGroundY: ground.y, surface: ground.surface, carrier: ground.body,
-    vx: 0, vz: 0, speed: 0, drift: { x: 0, z: 0 }, grounded: true,
+    vx: 0, vy: 0, vz: 0, speed: 0, drift: { x: 0, z: 0, air: 0 }, grounded: true,
     state: 'IDLE', stateT: 0, zone: null, yaw: spawn.heading, holdActive: false, holdYaw: 0, holdAngle: 0,
     stickX: 0, stickZ: 0, stickMag: 0, stickAngle: 0, jumpBuf: 0,
+    coyote: 0, fromY: ground.y, guardsInAir: false, noGrab: 0, jumpCut: false,
+    fade: 0, dissolve: 0, rootY: ground.y, airDashed: false, landHeavy: false,
+    braking: false, recentSpeed: 0,
   };
+  const initial = { ...state };
   const bodyCapsule = { radius: tuning.radius, height: tuning.height, guards: true, solid: true };
   const visit = (x: number, z: number) => world.groundAt(x, z, state.y + tuning.stepUp, state.y - tuning.stepDown);
   const around = (x: number, z: number, dx: number, dz: number, reach: number, top: number, bottom: number) => Boolean(
@@ -63,14 +66,52 @@ export function createGroundTraversal(world: CollisionWorld, spawn: Readonly<{ x
     },
   };
 
+  function changeState(name: string) {
+    state.state = name;
+    state.stateT = 0;
+  }
+
+  const takeoff = {
+    setState: changeState,
+    detach() {
+      const { carrier } = state;
+      if (!carrier) return;
+      state.carrier = null;
+      state.vx += carrier.vx;
+      state.vz += carrier.vz;
+      state.vy += Math.max(carrier.vy, 0);
+    },
+  };
+
+  function jump() {
+    state.jumpBuf = 0;
+    beginJump(state, tuning, takeoff);
+  }
+
+  const airborne = {
+    ...effects, guardedCapsule: bodyCapsule, normalCapsule: { ...bodyCapsule, guards: false },
+    jumpHeld: false, groundTolerance: 0.35, changeState,
+    land(dropHeight: number) {
+      finishLanding(state, dropHeight, tuning, { world, changeState, consumeBufferedJump: jump });
+    },
+  };
+
   return {
     state: state as Readonly<TraversalState>,
-    step(delta: number, input: WalkingInput, view: View) {
+    reset() { Object.assign(state, initial); },
+    step(delta: number, input: TraversalInput, view: View) {
       if (!Number.isFinite(delta) || delta < 0) throw RangeError('Traversal step must be nonnegative and finite');
-      if (delta === 0 || !state.grounded) return state.grounded;
+      if (delta === 0) return state.grounded;
       state.stateT += delta;
       state.jumpBuf = Math.max(0, state.jumpBuf - delta);
       updateInputSteering(state, input, view, null, delta, tuning.buffer, 1.6);
+      if (state.jumpBuf > 0 && (state.grounded || state.coyote > 0)) jump();
+      if (!state.grounded) {
+        state.coyote = Math.max(0, state.coyote - delta);
+        airborne.jumpHeld = input.jumpHeld;
+        stepAirborne(state, delta, tuning, airborne);
+        return state.grounded;
+      }
       const magnitude = state.stickMag;
       let target = 0;
       let facing = state.heading;
@@ -88,8 +129,8 @@ export function createGroundTraversal(world: CollisionWorld, spawn: Readonly<{ x
       const grip = 1 - Math.exp(-tuning.grip * delta);
       state.vx += (-Math.sin(direction) * state.speed - state.vx) * grip;
       state.vz += (-Math.cos(direction) * state.speed - state.vz) * grip;
-      state.grounded = stepGroundContact(state, delta, tuning, effects);
-      if (state.grounded) classifyGroundGait(state);
+      if (stepGroundContact(state, delta, tuning, effects)) classifyGroundGait(state);
+      else beginFall(state, tuning, takeoff);
       return state.grounded;
     },
   };

@@ -49,7 +49,7 @@ try {
     }, { once: true });
     status.hidden = !walk;
     if (walk) {
-      status.textContent = 'WASD or arrow keys to move';
+      status.textContent = 'WASD or arrows to move · Space to jump';
       runtime.start();
     }
     observer.observe(canvas);

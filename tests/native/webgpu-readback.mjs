@@ -348,6 +348,8 @@ const traversal = await createTraversalPreview({
 try {
   const registry = traversal.context.registry;
   const spawn = registry.get('player.position');
+  const initialRailFrame = registry.get('camera.railFrame');
+  const initialCamera = traversal.context.camera.position.clone();
   assert.equal(spawn.state, 'IDLE');
   assert.equal(spawn.grounded, true);
   device.pushErrorScope('validation');
@@ -362,12 +364,31 @@ try {
   assert.ok(movement.z < spawn.z - 3);
   assert.equal(movement.state, 'RUN');
   assert.equal(movement.grounded, true);
-  assert.equal(traversal.context.camera.position.z, movement.z);
+  const walkingRailFrame = registry.get('camera.railFrame');
+  assert.ok(walkingRailFrame > initialRailFrame);
+  assert.ok(traversal.context.camera.position.distanceTo(initialCamera) > 1);
+  for (let frame = 0; frame < 25; frame++) traversal.step();
+  const takeoff = registry.get('player.position');
+  assert.equal(pressSpace(), true);
+  let peak = takeoff.y;
+  let landed = false;
+  for (let frame = 0; frame < 100; frame++) {
+    if (frame === 12) keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'Space' }));
+    traversal.step();
+    const current = registry.get('player.position');
+    if (frame === 0) assert.equal(current.state, 'JUMP');
+    peak = Math.max(peak, current.y);
+    landed ||= current.state === 'LAND' && current.grounded;
+  }
+  assert.ok(peak > takeoff.y + 0.6, 'the jump must lift the player above the authored terrain');
+  assert.equal(landed, true, 'airborne motion must return to the terrain');
   pendingFrame(performance.now());
   traversal.render();
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
-  console.log('Chapter traversal WebGPU readback', JSON.stringify({ spawn, movement, startingPixel, skyPixel }));
+  console.log('Chapter traversal WebGPU readback', JSON.stringify({
+    spawn, movement, initialRailFrame, walkingRailFrame, jumpHeight: peak - takeoff.y, landed, startingPixel, skyPixel,
+  }));
 } finally {
   await traversal.dispose();
 }

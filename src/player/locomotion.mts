@@ -34,12 +34,12 @@ export interface JumpState extends FallState, GroundVelocity, Pick<TravelDirecti
 
 interface FallEffects {
   detach(): void;
-  play(name: string, options: { fade: number }): void;
+  play?(name: string, options: { fade: number }): void;
   setState(name: string): void;
 }
 
 interface JumpEffects extends FallEffects {
-  footstep(side: 'L', action: 'takeoff', heavy: boolean): void;
+  footstep?(side: 'L', action: 'takeoff', heavy: boolean): void;
 }
 
 /** Match the four published grounded locomotion bands. */
@@ -86,8 +86,8 @@ export function beginJump(state: JumpState, config: Pick<MovementConfig, 'gravit
   state.guardsInAir = false;
   state.fromY = state.y;
   state.coyote = 0;
-  effects.play(moving ? 'jump_fwd' : 'jump_up', {fade:.08});
-  effects.footstep('L','takeoff',false);
+  effects.play?.(moving ? 'jump_fwd' : 'jump_up', {fade:.08});
+  effects.footstep?.('L','takeoff',false);
   effects.setState('JUMP');
 }
 
@@ -99,6 +99,6 @@ export function beginFall(state: FallState, config: Pick<MovementConfig, 'coyote
   state.coyote = config.coyote;
   state.fromY = state.y;
   state.guardsInAir = true;
-  effects.play('fall', {fade:.2});
+  effects.play?.('fall', {fade:.2});
   effects.setState('FALL');
 }

@@ -81,25 +81,25 @@ export interface AirborneEffects<Mantle> extends CollisionEffects {
   guardedCapsule: CapsuleOptions;
   normalCapsule: CapsuleOptions;
   groundTolerance: number;
-  play: PlayClip;
+  play?: PlayClip;
   changeState: ChangeState;
-  grabLedge(): boolean;
+  grabLedge?(): boolean;
   land(dropHeight: number): void;
-  tryWallMantle(): boolean;
-  probeMantle(): Mantle | null;
-  beginMantle(mantle: Mantle): void;
-  updateFall(): void;
+  tryWallMantle?(): boolean;
+  probeMantle?(): Mantle | null;
+  beginMantle?(mantle: Mantle): void;
+  updateFall?(): void;
 }
 
 export interface LandingEffects {
   world: Pick<CollisionWorld, 'groundAt'>;
-  shake(strength: number): void;
-  sound(name: string): void;
-  hurt(reason: string): void;
-  isDead(): boolean;
-  die(): void;
-  play: PlayClip;
-  footstep(side: 'R' | 'L', action: 'land', force: boolean): void;
+  shake?(strength: number): void;
+  sound?(name: string): void;
+  hurt?(reason: string): void;
+  isDead?(): boolean;
+  die?(): void;
+  play?: PlayClip;
+  footstep?(side: 'R' | 'L', action: 'land', force: boolean): void;
   changeState: ChangeState;
   consumeBufferedJump(): void;
 }
@@ -209,11 +209,11 @@ export function stepAirborne<Mantle,>(state: AirborneState, delta: number,
   if(contact.hit)effects.deflect(contact);
   state.speed=Math.hypot(state.vx,state.vz);
   if(state.state==='JUMP'&&state.vy< -1.5) {
-    effects.play('fall',{fade:.25});
+    effects.play?.('fall',{fade:.25});
     effects.changeState('FALL');
   }
   if(state.noGrab>0) state.noGrab-=delta;
-  else if(state.vy<3&&effects.grabLedge())return;
+  else if(state.vy<3&&effects.grabLedge?.())return;
   if(state.vy<=0) {
     const ground=effects.world.groundAt(state.x,state.z,
       Math.max(priorY+.1,state.y+effects.groundTolerance),state.y-.02);
@@ -227,15 +227,15 @@ export function stepAirborne<Mantle,>(state: AirborneState, delta: number,
     if(state.stickMag>.1&&state.vy> -7) {
       if(contact.solid &&
         -(state.stickX*contact.nx+state.stickZ*contact.nz) >
-          .3*state.stickMag && effects.tryWallMantle())return;
-      const mantle=effects.probeMantle();
-      if(mantle) {
+          .3*state.stickMag && effects.tryWallMantle?.())return;
+      const mantle=effects.probeMantle?.();
+      if(mantle && effects.beginMantle) {
         effects.beginMantle(mantle);
         return;
       }
     }
   }
-  effects.updateFall();
+  effects.updateFall?.();
 }
 
 /** Land after a drop or jump, with carrier momentum and heavy-fall effects. */
@@ -253,21 +253,21 @@ export function finishLanding(state: LandingState, dropHeight: number,
   state.airDashed=false;
   state.landHeavy=dropHeight>config.heavyFall;
   if(state.landHeavy) {
-    effects.shake(1);
-    effects.sound('heavyLanding');
-    effects.hurt('fall');
-    if(effects.isDead()) {
-      effects.die();
+    effects.shake?.(1);
+    effects.sound?.('heavyLanding');
+    effects.hurt?.('fall');
+    if(effects.isDead?.()) {
+      effects.die?.();
       return;
     }
-  } else if(dropHeight>2) effects.shake(.35);
+  } else if(dropHeight>2) effects.shake?.(.35);
   const moving=!state.landHeavy&&state.stickMag>.1&&
     Math.hypot(state.vx,state.vz)>2;
-  effects.play(state.landHeavy?'land_heavy':'land',{
+  effects.play?.(state.landHeavy?'land_heavy':'land',{
     fade:.12,speed:moving?1.6:1,
   });
-  effects.footstep('R','land',dropHeight>1.5||state.landHeavy);
-  effects.footstep('L','land',dropHeight>1.5||state.landHeavy);
+  effects.footstep?.('R','land',dropHeight>1.5||state.landHeavy);
+  effects.footstep?.('L','land',dropHeight>1.5||state.landHeavy);
   effects.changeState('LAND');
   if(state.jumpBuf>0)effects.consumeBufferedJump();
 }
