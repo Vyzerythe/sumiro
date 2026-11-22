@@ -2,12 +2,13 @@
 
 **Status:** An integration experiment, not the final rebuild of Sumiro.
 
-The repository's published game still lives in `sumiro/`. The source-backed development build assembles an isolated copy that **loads the reconstructed chapter, save, collectible-scroll and collision-geometry/moving-body modules into the actual original game runtime**.
+The repository's published game lives in `sumiro/`. The development builder assembles an isolated copy and loads reconstructed domain, collision, player, and render-sizing modules into the published runtime.
 
 ## Build and serve
 
 ```sh
-node scripts/build-reconstructed-dev.mjs
+npm ci
+npm run build:dev
 python3 -m http.server 8000 --directory .local-build
 ```
 
@@ -15,19 +16,18 @@ Open `http://localhost:8000/sumiro/`. Compare with the unmodified published game
 
 ## What the script does
 
-1. Validates the original immutable compiled chapter and game chunks using pinned Git blob hashes; fails if source artifacts changed.
-2. Copies `sumiro/` and `src/` into `.local-build/`.
-3. Replaces the **copied** chapter chunk with an ES module adapter mapping the original minified export names to `src/domain/chapters.mjs`.
-4. Replaces the **copied** game save prelude with imports bound to `src/domain/save.mjs`.
-5. Rebinds the copied collision module's wall extrusion and polygon containment exports to readable `src/physics/geometry.mjs`, retaining the compiled collision-world runtime.
-6. Writes a JSON provenance report listing exactly which source modules are used.
+1. Validates each chunk it will adapt against a pinned Git blob hash.
+2. Compiles the recovered TypeScript before replacing the previous development output.
+3. Copies the published distribution and readable JavaScript into `.local-build/` and writes the emitted modules alongside them.
+4. Rebinds the copied chunks to readable source and writes their provenance to `reconstruction-build.json`.
 
-Only the **development copy** is modified; tracked artifacts in `sumiro/` are untouched. This does not introduce a package manager or attempt to recompile unrelated generated modules.
+The build adapts only the listed chunks in the isolated output. The rendering backend in this build is still the published WebGL implementation.
 
 ## Test
 
 ```sh
-node --test tests/*.test.mjs
+npm run typecheck
+npm test
 ```
 
 The integration test builds the copied tree, confirms the original file contents did not change, verifies the new adapter can import the readable chapter module, and checks that save references are redirected. CI runs this test.
@@ -50,7 +50,7 @@ The required gate asserts browser boot, title-menu readiness and resource loadin
 
 **Observed issue (2026-11-16/17):** An opt-in New Game/PLAY/save diagnostic successfully reached the **original published** title menu and clicked New Game, but the original remained in `CHAPTER_CARD` for at least 45 seconds under headless software-rendered Chromium, with no saved game yet. No uncaught JS errors or HTTP failures were reported. The source-backed candidate was not reached in that failed run. This is an **inconclusive browser-environment/transition gate**, not a verified reconstruction regression or evidence of full gameplay parity. Run `node scripts/browser-smoke.mjs --interaction` for that stricter diagnostic; it is intentionally not a required CI check until its baseline behavior is understood. [Diagnostic run](https://github.com/Vyzerythe/sumiro/actions/runs/44013316723). Those require additional deterministic UI/playthrough probes.
 
-The browser test's package installation is transient to avoid presenting Playwright as a dependency of the distributed game. Before a permanent automation stack is adopted, use a checked-in dependency manifest and lockfile for the developer/test toolchain.
+The browser driver installation is transient. The source compiler and Three.js r187 dependencies are pinned separately in the repository lockfile.
 
 ## Limits and safety gates
 
@@ -125,3 +125,7 @@ The isolated development player now delegates its ground sweep/support test, air
 ### Authored Chapter One leap diagnostic (reference-first)
 
 The Chromium script now supports `node scripts/browser-smoke.mjs --play --gap-leap --reference-only` to exercise the published `gap_forward` link and `rim_front` ledge. It derives a ground-supported launch candidate from the level's actual trigger polygon, chooses direction from authored ledge points, and injects a buffered jump through the published player controller while recording frame-by-frame state. The enforced goal is the live `LEAP` → `GRAB`/`HANG` at `rim_front` → `CLIMB` entry, not a simulated direct state switch. **Completion to grounded `IDLE` is recorded when observed but is not yet enforced:** the published game reached `CLIMB` in headless Chromium, then stopped advancing its simulation clock for the duration of the timeout (diagnostic run 44034828395). This is an unresolved browser-environment/animation limitation, not evidence of a reconstructed regression. The test intentionally marks its scripted aiming and jump-buffer injection as test instrumentation, distinct from keyboard input. The published reference was confirmed to reach all three enforced states, so the CI gate now runs `node scripts/browser-smoke.mjs --play --gap-leap` against both the original and the source-backed development build. An optional `--reference-only` flag remains available for diagnosing baseline behavior in isolation.
+
+### Typed frame resolution
+
+The copied renderer delegates scale limits, pixel-budget clamping, full-resolution and reduced-resolution target sizes, and shader pixel scaling to `src/rendering/frame-resolution.mts`. The parity test runs the original resize methods on the same inputs and compares their target sizes and uniform values.

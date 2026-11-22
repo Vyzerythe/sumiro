@@ -14,10 +14,11 @@ const kit = 'sumiro/bundle/kit-B01EgPBo.js';
 const collision = 'sumiro/bundle/collision-DtBQEpmQ.js';
 const player = 'sumiro/bundle/player-1_KrBWnI.js';
 const trail = 'sumiro/bundle/trail-BFIL-IHB.js';
+const renderer = 'sumiro/bundle/render_pipeline-BTCk4Dyc.js';
 
 test('source-backed build preserves originals and binds live domain imports', async () => {
   const hash = data => createHash('sha256').update(data).digest('hex');
-  const publishedChunks = [game, chapters, kit, collision, player, trail];
+  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer];
   const before = await Promise.all(publishedChunks.map(p => readFile(join(root,p))));
   try {
     const result = spawnSync(process.execPath, ['scripts/build-reconstructed-dev.mjs', '--out', out], {
@@ -132,6 +133,15 @@ test('source-backed build preserves originals and binds live domain imports', as
       r: readableTrail.createMovementTrail,
       t: readableTrail.trailCapsule,
     });
+    const outputRenderer = await readFile(join(out, renderer), 'utf8');
+    assert.match(outputRenderer, /from '\.\.\/\.\.\/src\/rendering\/frame-resolution\.mjs'/);
+    assert.match(outputRenderer, /_ssFull\(view\)\{return capRenderScale\(/);
+    assert.match(outputRenderer, /_ssFor\(view\)\{return this\.ssFixed\|\|selectAdaptiveRenderScale\(/);
+    assert.match(outputRenderer, /setSize\(view\)\{this\.ss=this\._ssFor\(view\);const \{[^}]+\}=measureRenderTargets\(/);
+    const resolution = await import(pathToFileURL(join(out, 'src/rendering/frame-resolution.mjs')).href);
+    assert.equal(resolution.capRenderScale(2880, 2, 2160), 1);
+    const syntax = spawnSync(process.execPath, ['--check', join(out, renderer)], { encoding: 'utf8' });
+    assert.equal(syntax.status, 0, syntax.stderr);
   } finally {
     await rm(out, { recursive: true, force: true });
   }

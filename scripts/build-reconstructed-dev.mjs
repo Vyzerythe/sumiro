@@ -28,6 +28,7 @@ const originalKit = join(root, 'sumiro/bundle/kit-B01EgPBo.js');
 const originalCollision = join(root, 'sumiro/bundle/collision-DtBQEpmQ.js');
 const originalPlayer = join(root, 'sumiro/bundle/player-1_KrBWnI.js');
 const originalTrail = join(root, 'sumiro/bundle/trail-BFIL-IHB.js');
+const originalRenderer = join(root, 'sumiro/bundle/render_pipeline-BTCk4Dyc.js');
 const EXPECTED_GIT_BLOBS = {
   game: '284349f2f8d0235e163f3c9b88b17ed222e3b269',
   chapters: '3da4e0f31fed783d0e548dd40fd0c1113cca16ec',
@@ -35,6 +36,7 @@ const EXPECTED_GIT_BLOBS = {
   collision: 'bb06154a9be5a24421a017f4c84adf7c87064d1b',
   player: '2ba1dbb18011510e025d5f3af06b045f143a3d10',
   trail: '950ee6272e85d1c446a2de97ce0df4930c6d3145',
+  renderer: 'e6b0a92ac434dbae6f6ffa8227b2f09d539a594d',
 };
 const sha = data => createHash('sha1')
   .update('blob ' + Buffer.byteLength(data) + '\0')
@@ -45,7 +47,9 @@ const kit = await readFile(originalKit);
 const collision = await readFile(originalCollision);
 const player = await readFile(originalPlayer);
 const trail = await readFile(originalTrail);
-if (sha(game) !== EXPECTED_GIT_BLOBS.game || sha(chapters) !== EXPECTED_GIT_BLOBS.chapters || sha(kit) !== EXPECTED_GIT_BLOBS.kit || sha(collision) !== EXPECTED_GIT_BLOBS.collision || sha(player) !== EXPECTED_GIT_BLOBS.player || sha(trail) !== EXPECTED_GIT_BLOBS.trail) {
+const renderer = await readFile(originalRenderer);
+for (const [name, bundle] of Object.entries({ game, chapters, kit, collision, player, trail, renderer })) {
+  if (sha(bundle) === EXPECTED_GIT_BLOBS[name]) continue;
   throw Error('Published bundle has changed: audit integration boundaries before rebuilding');
 }
 
@@ -179,6 +183,28 @@ const trailAdapter = [
   "  createMovementTrail as r, trailCapsule as t } from '../../src/player/movement-trail.mjs';",
   '',
 ].join('\n');
+
+let rendererRewritten = renderer.toString('utf8');
+for (const [boundary, replacement] of [
+  [/_ssFull\(e\)\{[^}]+\}/g, '_ssFull(view){return capRenderScale(view.drawHeight,C.render.ss,O)}'],
+  [/_ssFor\(e\)\{[^}]+\}/g, '_ssFor(view){return this.ssFixed||selectAdaptiveRenderScale(view,this.pixelCap,this._ssFull(view),A[A.length-1])}'],
+  [/setSize\(e\)\{this\.ss=this\._ssFor\(e\);[^}]+\}/g, [
+    'setSize(view){',
+    'this.ss=this._ssFor(view);',
+    'const {width,height,keyWidth,keyHeight,effectiveScale,pixelScale}=measureRenderTargets(view,this.ss,k);',
+    'this.gbuf.setSize(width,height);this.depthCopy.setSize(width,height);this.keyMap.setSize(keyWidth,keyHeight);',
+    'this.lineMask.setSize(width,height);this.post.setSize(width,height);E.uRes.value.set(width,height);',
+    'E.uPxScale.value=pixelScale;this.gradeMaterial.uniforms.uSS.value=effectiveScale;',
+    'this.compositeMaterial.uniforms.uSS.value=effectiveScale;}',
+  ].join('')],
+]) {
+  if ([...rendererRewritten.matchAll(boundary)].length !== 1) {
+    throw Error('Published renderer resolution boundary changed: re-audit ' + boundary);
+  }
+  rendererRewritten = rendererRewritten.replace(boundary, replacement);
+}
+rendererRewritten = "import { capRenderScale, measureRenderTargets, selectAdaptiveRenderScale } from '../../src/rendering/frame-resolution.mjs';\n"
+  + rendererRewritten;
 const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 
 await rm(output, { recursive: true, force: true });
@@ -198,6 +224,7 @@ await writeFile(join(output, 'sumiro/bundle/kit-B01EgPBo.js'), kitRewritten);
 await writeFile(join(output, 'sumiro/bundle/collision-DtBQEpmQ.js'), collisionRewritten);
 await writeFile(join(output, 'sumiro/bundle/player-1_KrBWnI.js'), playerRewritten);
 await writeFile(join(output, 'sumiro/bundle/trail-BFIL-IHB.js'), trailAdapter);
+await writeFile(join(output, 'sumiro/bundle/render_pipeline-BTCk4Dyc.js'), rendererRewritten);
 
 const report = {
   kind: 'transitional-source-backed-development-build',
@@ -209,9 +236,10 @@ const report = {
     'sumiro/bundle/collision-DtBQEpmQ.js',
     'sumiro/bundle/player-1_KrBWnI.js',
     'sumiro/bundle/trail-BFIL-IHB.js',
+    'sumiro/bundle/render_pipeline-BTCk4Dyc.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts', 'src/rendering/frame-resolution.mts'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');
-console.log('Built ' + output + '/sumiro/ with readable chapter and save modules');
+console.log('Built ' + join(output, 'sumiro') + ' with ' + report.sourceModules.length + ' recovered source modules');
