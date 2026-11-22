@@ -6,14 +6,16 @@ import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
 import { bindInkMeshMaterials } from '../rendering/ink-mesh-materials.mts';
 import { createChapterManager } from '../runtime/chapter-manager.mts';
 import { createSourceRuntime } from '../runtime/source-runtime.mts';
+import { loadChapterTwoScene } from './chapter-two-scene.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 
 interface ChapterPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'audio' | 'gpu' | 'viewport'> {
   canvas: HTMLCanvasElement | OffscreenCanvas;
+  chapter?: string;
 }
 
-export async function createChapterPreview({ canvas, ...options }: ChapterPreviewOptions) {
+export async function createChapterPreview({ canvas, chapter = firstChapterId, ...options }: ChapterPreviewOptions) {
   const scene = new Scene();
   scene.background = new Color(0xc9c6bf);
   const camera = new PerspectiveCamera(42, options.viewport.width / options.viewport.height, 0.1, 1000);
@@ -48,6 +50,10 @@ export async function createChapterPreview({ canvas, ...options }: ChapterPrevie
           const chapters = createChapterManager<Object3D, Sphere>({
             scene: stage,
             async load(id, resources) {
+              if (id === 'ch2_pass') {
+                const root = await loadChapterTwoScene(context.assets, resources);
+                return { root, data: new Box3().setFromObject(root).getBoundingSphere(new Sphere()) };
+              }
               if (id !== firstChapterId) throw Error(`Geometry preview is unavailable for ${id}`);
               const model = await context.assets.loadGLTF('levels/ch1_climb/pieces.glb', {
                 displaySpace: false, signal: resources.signal,
@@ -61,8 +67,8 @@ export async function createChapterPreview({ canvas, ...options }: ChapterPrevie
             },
           });
           lifetime.defer(() => chapters.dispose());
-          const chapter = await chapters.switchTo(firstChapterId, { signal: lifetime.signal });
-          bounds.copy(chapter.data);
+          const active = await chapters.switchTo(chapter, { signal: lifetime.signal });
+          bounds.copy(active.data);
           frameChapter();
         },
         beforeRender: frameChapter,

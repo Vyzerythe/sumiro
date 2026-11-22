@@ -31,7 +31,8 @@ try {
     ? await createTraversalPreview({ ...options, ...(progress ? { progress } : {}),
       input: { keyboardTarget: window, getGamepads: () => navigator.getGamepads() } })
     : null;
-  const runtime = traversal ?? await createChapterPreview(options);
+  const chapter = query.get('chapter');
+  const runtime = traversal ?? await createChapterPreview({ ...options, ...(chapter ? { chapter } : {}) });
   if (page.signal.aborted) {
     await runtime.dispose();
   } else {

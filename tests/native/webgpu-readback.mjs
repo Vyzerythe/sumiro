@@ -440,6 +440,7 @@ try {
 }
 
 const checkpoints = [];
+let rejectCourt = true;
 const resumedRun = createRunProgress({
   getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau', flags: { inkStep: true }, abilities: { inkStep: true } }),
   setItem(key, value) { checkpoints.push([key, JSON.parse(value)]); },
@@ -447,7 +448,10 @@ const resumedRun = createRunProgress({
 const resumed = await createTraversalPreview({
   canvas,
   viewport: { width: 96, height: 72, pixelRatio: 1 },
-  assets: chapterAssets,
+  assets: { ...chapterAssets, fetch(path) {
+    if (rejectCourt && new URL(path).pathname.endsWith('/ch2_pass/court.glb')) return Promise.resolve(new Response(null, { status: 503 }));
+    return chapterAssets.fetch(path);
+  } },
   progress: resumedRun,
   input: { keyboardTarget },
   gpu: nativeGpu,
@@ -476,6 +480,41 @@ try {
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
   console.log('Chapter checkpoint WebGPU resume', JSON.stringify(position));
+
+  const previousRoot = resumed.context.scene.getObjectByName('ch1_climb');
+  assert.ok(previousRoot?.parent);
+  await assert.rejects(resumed.advanceChapter(), /HTTP 503/);
+  assert.equal(resumed.context.scene.getObjectByName('ch1_climb'), previousRoot);
+  assert.equal(resumedRun.current.chapter, 'ch1_climb');
+  assert.equal(checkpoints.length, 1);
+  rejectCourt = false;
+  assert.equal(await resumed.advanceChapter(), true);
+  assert.equal(resumedRun.current.chapter, 'ch2_pass');
+  assert.equal(checkpoints.at(-1)[1].chapter, 'ch2_pass');
+  assert.equal(previousRoot.parent, null);
+  const nextRoot = resumed.context.scene.getObjectByName('ch2_pass');
+  assert.ok(nextRoot?.parent);
+  pendingFrame(performance.now());
+  device.pushErrorScope('validation');
+  resumed.render();
+  const arrival = resumed.context.registry.get('player.position');
+  assert.deepEqual([arrival.x, arrival.z], [14, -15.5]);
+  assert.equal(arrival.grounded, true);
+  assert.equal(resumed.context.registry.get('chapter.current'), 'ch2_pass');
+  const chapterTwoPixel = await sample(48, 58);
+  assert.equal(chapterTwoPixel[3], 255);
+  const chapterSamples = [[20, 58], [35, 48], [48, 58], [63, 48], [75, 58]];
+  const passPixels = await Promise.all(chapterSamples.map(([x, y]) => sample(x, y)));
+  nextRoot.visible = false;
+  pendingFrame(performance.now());
+  resumed.render();
+  const emptyPixels = await Promise.all(chapterSamples.map(([x, y]) => sample(x, y)));
+  assert.ok(passPixels.some((pixel, index) => pixel.slice(0, 3)
+    .some((channel, component) => Math.abs(channel - emptyPixels[index][component]) > 8)));
+  nextRoot.visible = true;
+  const switchError = await device.popErrorScope();
+  assert.equal(switchError, null, switchError?.message);
+  console.log('Native chapter switch WebGPU readback', JSON.stringify({ arrival, chapterTwoPixel }));
 } finally {
   await resumed.dispose();
 }
