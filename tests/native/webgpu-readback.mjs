@@ -612,6 +612,11 @@ try {
   assert.equal(pinesPixel[3], 255);
   const pinesError = await device.popErrorScope();
   assert.equal(pinesError, null, pinesError?.message);
+  const pineBridge = resumed.context.scene.getObjectByName('br5_mesh');
+  assert.ok(pineBridge);
+  const initialRoll = pineBridge.rotation.z;
+  for (let step = 0; step < 30; step++) resumed.step();
+  assert.ok(Math.abs(pineBridge.rotation.z - initialRoll) > 0.01);
   console.log('Native pines WebGPU readback', JSON.stringify({ pines, pinesPixel }));
 
   restoreDraco = installDracoWorker();
@@ -627,6 +632,22 @@ try {
     const root = resumed.context.scene.getObjectByName(id);
     assert.ok(root?.parent && prior.parent === null);
     assert.equal(resumedRun.current.chapter, id);
+    resumed.render();
+    if (id === 'ch4_temple') {
+      const carrier = root.getObjectByName('n_mv');
+      assert.ok(carrier);
+      const before = carrier.position.z;
+      for (let step = 0; step < 45; step++) resumed.step();
+      assert.ok(root.getObjectByName('g_great')?.children.length === 2);
+      assert.ok(Math.abs(carrier.position.z - before) > 0.5);
+    }
+    if (id === 'ch5_sea') {
+      const sea = root.getObjectByName('sea'), raft = root.getObjectByName('raft_node');
+      assert.ok(sea && raft);
+      for (let step = 0; step < 600; step++) resumed.step();
+      assert.ok(Math.abs(sea.position.y - 1.5) < 1e-8);
+      assert.ok(Math.abs(raft.position.y - (sea.position.y + 0.4)) < 1e-8);
+    }
     pendingFrame(performance.now());
     device.pushErrorScope('validation');
     resumed.render();

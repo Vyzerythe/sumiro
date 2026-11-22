@@ -44,7 +44,7 @@ export function createTraversalController(
     ledge: null, ledgeS: 0, shimmyHold: null, hangForward: 0, hangBack: 0, hangBackFresh: false,
     leap: null, mantle: null, gestureClip: null, gestureSpeed: 1,
   };
-  const initial = { ...state };
+  const initial = { ...state, drift: { ...state.drift } };
   let inkCooldown = 0;
   let burst: { x: number; z: number; air: boolean } | null = null;
   const bodyCapsule = { radius: tuning.radius, height: tuning.height, guards: true, solid: true };
@@ -222,6 +222,7 @@ export function createTraversalController(
 
   return {
     state: state as Readonly<TraversalState>,
+    setDrift(drift: Readonly<TraversalState['drift']>) { Object.assign(state.drift, drift); },
     moveCombat(dx: number, dz: number, heading: number) {
       if (!state.grounded || ![dx, dz, heading].every(Number.isFinite)) return state;
       const contact = world.sweepCapsule(state, dx, dz, bodyCapsule, effects.collision);
@@ -239,7 +240,7 @@ export function createTraversalController(
       return state;
     },
     reset(destination?: Readonly<{ x: number; z: number; heading: number }>) {
-      Object.assign(state, initial);
+      Object.assign(state, initial, { drift: { ...initial.drift } });
       inkCooldown = 0;
       burst = null;
       const support = destination && world.groundAt(destination.x, destination.z);

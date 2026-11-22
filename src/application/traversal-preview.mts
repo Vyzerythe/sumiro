@@ -23,6 +23,7 @@ import { createChapterSixIceHolds } from './chapter-six-ice-holds.mts';
 import { createChapterTwoMechanisms } from './chapter-two-mechanisms.mts';
 import { loadChapterTwoDuel } from './chapter-two-duel.mts';
 import { bindChapterTwoPresentation } from './chapter-two-presentation.mts';
+import { mountLateChapterMechanisms, type LateChapterMechanisms } from './late-chapter-mechanisms.mts';
 import { getStaticChapter } from './static-chapter-catalog.mts';
 import { createStaticTraversalCamera } from './static-traversal-camera.mts';
 
@@ -44,6 +45,7 @@ interface TraversalChapter {
   checkpoints?: ReturnType<typeof createCheckpointInteraction>;
   exit?: NonNullable<ReturnType<typeof createChapterExit>>;
   iceHolds?: ReturnType<typeof createChapterSixIceHolds>;
+  lateMechanisms?: LateChapterMechanisms;
   killDrop: number;
   killY?: number;
 }
@@ -92,10 +94,13 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     if (active !== current) {
       active = current;
       teleport++;
+      camera.far = current.id === 'ch5_sea' ? 800 : 100;
+      camera.updateProjectionMatrix();
       visual.reset(current.data.player.state);
       current.data.story?.enter(progress.current);
       current.data.mechanisms?.driver.enter(progress.current);
       current.data.mechanisms?.present();
+      current.data.lateMechanisms?.reset();
       current.data.duel?.driver.reset({ cleared: Boolean(progress.current.flags.ch2_sword_wraith) });
       current.data.duel?.present(0);
       if (!current.data.story) context.registry.set('chapter.interaction', { type: 'prompt', target: null });
@@ -187,6 +192,11 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
               const definition = getStaticChapter(id);
               const { world, spawn: origin, killDrop = Infinity, killY } = definition.createWorld();
               const root = await definition.loadGeometry(context.assets, resources);
+              const lateMechanisms = mountLateChapterMechanisms(id, world, root, resources, progress, event => {
+                if (event.type === 'hint') context.registry.set('chapter.interaction', event);
+                else context.registry.set('chapter.mechanism', event);
+                if (event.type === 'cue' && event.name === 'gate') void audioCues?.play('gate');
+              });
               let mechanisms: TraversalChapter['mechanisms'];
               let iceHolds: TraversalChapter['iceHolds'];
               if (id === 'ch2_pass') {
@@ -230,7 +240,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
               return { root, data: { world, origin, player, view: createStaticTraversalCamera(world, id), killDrop, killY,
                 checkpoints: createCheckpointInteraction(id, world, progress),
                 ...(mechanisms ? { mechanisms } : {}), ...(duel ? { duel } : {}), ...(exit ? { exit } : {}),
-                ...(iceHolds ? { iceHolds } : {}) } };
+                ...(iceHolds ? { iceHolds } : {}), ...(lateMechanisms ? { lateMechanisms } : {}) } };
             },
           });
           const manager = chapters;
@@ -246,7 +256,8 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
           if (context.paused) return;
           const current = synchronize(context);
           if (!current || !visual) return;
-          const { player, story, mechanisms, duel, checkpoints, exit, iceHolds, killDrop, killY = -Infinity } = current.data;
+          const { player, story, mechanisms, duel, checkpoints, exit, iceHolds, lateMechanisms,
+            killDrop, killY = -Infinity } = current.data;
           iceHolds?.step(delta, { state: player.state.state, ledge: player.state.ledge, teleports: teleport });
           if (mechanisms) {
             const { driver, present } = mechanisms;
@@ -258,8 +269,9 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
             driver.step(delta, player.state);
             present();
           }
+          const fell = lateMechanisms?.step(delta, player, context.input.attack, context.time.t);
           const combatAction = duel?.driver.player.action;
-          if ((!combatAction || combatAction === 'IDLE') && !exit?.finishing) player.step(delta, context.input, steering);
+          if (!fell && (!combatAction || combatAction === 'IDLE') && !exit?.finishing) player.step(delta, context.input, steering);
           duel?.driver.step(delta, player.state, {
             attack: context.input.attack, parry: context.input.parry, swordAvailable: progress.current.abilities.sword === true,
           });
@@ -268,9 +280,10 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
             phase: duel.driver.phase, enemy: { ...duel.driver.enemy }, player: { ...duel.driver.player },
           });
           const defeated = duel?.driver.phase === 'defeated' && duel.driver.player.elapsed > 2.1;
-          if (defeated || player.state.lastGroundY - player.state.y > killDrop || player.state.y < killY) {
+          if (fell || defeated || player.state.lastGroundY - player.state.y > killDrop || player.state.y < killY) {
             player.reset(resolveChapterSpawn(current.id, current.data.origin, progress.current, current.data.world));
             duel?.driver.reset({ cleared: Boolean(progress.current.flags.ch2_sword_wraith) });
+            lateMechanisms?.reset();
             teleport++;
             visual.reset(player.state);
           }

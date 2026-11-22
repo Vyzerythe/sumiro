@@ -41,6 +41,8 @@ function valueNoise(noise: Texture3DNode, point: Node<'vec3'>) {
   return noise.sample(uvw).level(float(0)).r;
 }
 
+export { valueNoise as sampleInkNoise };
+
 function fractalNoise(noise: Texture3DNode, point: Node<'vec3'>) {
   return valueNoise(noise, point).mul(0.5333)
     .add(valueNoise(noise, point.mul(2.03).add(11.7)).mul(0.2667))

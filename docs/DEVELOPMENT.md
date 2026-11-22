@@ -54,6 +54,8 @@ To serve the native application, run `npm run build:source` and serve the reposi
 
 The traversal preview uses the supplied player model and its traversal clips. Use `?walk=1&continue=1` to read an existing checkpoint from the same browser origin. The preview resolves the authored shrine stand and leaves stored browser saves untouched. The native tests inject a writable store to verify explicit shrine interaction saves in Chapters One and Five.
 
+The native runtime advances the Pines bridges, crumbles, tilting platforms and gusts, the Temple bells and lifts, the Sea tide and floating carriers, and the Summit ice holds. The Sea's TSL water uses the authored noise and tide controls. The published shoreline and mirror passes, parts of later encounter logic, and several chapter-specific effects remain to be recovered.
+
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 
 ```sh
