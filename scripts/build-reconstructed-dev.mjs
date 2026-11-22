@@ -8,17 +8,16 @@
  */
 import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { resolve, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const outArg = process.argv.indexOf('--out');
 const output = resolve(root, outArg >= 0 ? process.argv[outArg + 1] ?? '' : '.local-build');
 if (outArg >= 0 && !process.argv[outArg + 1]) throw Error('--out requires a directory');
-const relativeOutput = output.slice(root.length + 1);
 // Only direct, untracked scratch directories are disposable. Never accept a
 // tracked path, a nested path under sumiro/src, or an ancestor of the repo.
-if (!output.startsWith(root + '/') || !/^\.local-build(?:-[a-z0-9-]+)?$/.test(relativeOutput)) {
+if (dirname(output) !== root || !/^\.local-build(?:-[a-z0-9-]+)?$/.test(basename(output))) {
   throw Error('Output must be a root-level .local-build[-name] scratch directory');
 }
 
