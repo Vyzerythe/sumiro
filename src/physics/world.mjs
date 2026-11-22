@@ -7,7 +7,7 @@
  * Reference: sumiro/bundle/collision-DtBQEpmQ.js (Git blob
  * bb06154a9be5a24421a017f4c84adf7c87064d1b).
  */
-import { createMovingTriangleBody } from "./moving-body.mjs";
+import { createMovingTriangleBody } from "./moving-body.mts";
 
 const CELL_SIZE = 2;
 const SOLID_MARGIN = 0.35;

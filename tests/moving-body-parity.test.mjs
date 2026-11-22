@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createMovingTriangleBody } from '../src/physics/moving-body.mjs';
+import { createMovingTriangleBody } from '../src/physics/moving-body.mts';
 import { t as createPublishedWorld } from '../sumiro/bundle/collision-DtBQEpmQ.js';
 
 const batches = [
@@ -32,6 +32,25 @@ test('initial triangle layout, triangle filtering and body state match shipped e
   const [candidate, original] = pair();
   assert.deepEqual(bodySnapshot(candidate), bodySnapshot(original));
   assert.equal(candidate.tris.length, 3, 'degenerate triangle must be skipped');
+});
+
+test('typed triangle buffers preserve their storage, metadata and pose rounding', () => {
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  const inputs = [{ positions }];
+  const candidate = createMovingTriangleBody('typed', inputs);
+  const original = createPublishedWorld().addBody('typed', inputs);
+  for (const body of [candidate, original]) {
+    const [triangle] = body.tris;
+    assert.ok(triangle instanceof Float32Array);
+    assert.ok(triangle.local instanceof Float32Array);
+    assert.notStrictEqual(triangle.buffer, positions.buffer);
+    assert.notStrictEqual(triangle.buffer, triangle.local.buffer);
+    triangle.kind = 2;
+    triangle.group = 'platform';
+    triangle.fades = 'platformMesh';
+    body.setPose(0.1, 0.2, 0.3, 0.4, 0.5, 0.6);
+  }
+  assert.deepEqual(bodySnapshot(candidate), bodySnapshot(original));
 });
 
 test('pose matrix, velocity, orientation and world/local projection remain equivalent', () => {

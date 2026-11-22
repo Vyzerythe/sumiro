@@ -15,10 +15,11 @@ const collision = 'sumiro/bundle/collision-DtBQEpmQ.js';
 const player = 'sumiro/bundle/player-1_KrBWnI.js';
 const trail = 'sumiro/bundle/trail-BFIL-IHB.js';
 const renderer = 'sumiro/bundle/render_pipeline-BTCk4Dyc.js';
+const sight = 'sumiro/bundle/sight-DXR0ElmN.js';
 
 test('source-backed build preserves originals and binds live domain imports', async () => {
   const hash = data => createHash('sha256').update(data).digest('hex');
-  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer];
+  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer, sight];
   const before = await Promise.all(publishedChunks.map(p => readFile(join(root,p))));
   try {
     const result = spawnSync(process.execPath, ['scripts/build-reconstructed-dev.mjs', '--out', out], {
@@ -132,6 +133,15 @@ test('source-backed build preserves originals and binds live domain imports', as
       n: readableTrail.trailHeightTolerance,
       r: readableTrail.createMovementTrail,
       t: readableTrail.trailCapsule,
+    });
+    const sightAdapter = await import(pathToFileURL(join(out, sight)).href);
+    const readableSight = await import(pathToFileURL(join(out, 'src/physics/sight.mjs')).href);
+    assert.deepEqual({ ...sightAdapter }, {
+      a: readableSight.createMeshRaycaster,
+      i: readableSight.hasLineOfSight,
+      n: readableSight.relaxLongEdgesInPlace,
+      r: readableSight.raycastVisibleSurface,
+      t: readableSight.filterTrianglesByMaxEdge,
     });
     const outputRenderer = await readFile(join(out, renderer), 'utf8');
     assert.match(outputRenderer, /from '\.\.\/\.\.\/src\/rendering\/frame-resolution\.mjs'/);

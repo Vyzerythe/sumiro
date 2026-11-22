@@ -72,7 +72,7 @@ The exported polyline extrusion and polygon-containment routines have executable
 
 ### Moving collision body
 
-The development build now sources the moving-triangle body factory from `src/physics/moving-body.mjs`. It preserves matrix transforms, velocities, bounds, triangle filtering, and carrying points on moving surfaces. Differential tests compare the readable source with `world.addBody(...)` from the unchanged published collision module, including empty bodies and repeated poses. Full world collision, raycasts, and capsule sweeps remain compiled.
+The development build compiles the moving-triangle body factory from `src/physics/moving-body.mts`. It preserves matrix transforms, velocities, bounds, triangle filtering, and carrying points on moving surfaces. Differential coverage includes empty bodies, repeated poses, and typed arrays with caller-visible metadata.
 
 ### Source-backed collision world
 
@@ -129,3 +129,7 @@ The Chromium script now supports `node scripts/browser-smoke.mjs --play --gap-le
 ### Typed frame resolution
 
 The copied renderer delegates scale limits, pixel-budget clamping, full-resolution and reduced-resolution target sizes, and shader pixel scaling to `src/rendering/frame-resolution.mts`. The parity test runs the original resize methods on the same inputs and compares their target sizes and uniform values.
+
+### Mesh visibility and geometry
+
+The copied sight chunk loads `src/physics/sight.mts`, covering mesh extraction, triangle raycasts, line-of-sight checks, edge filtering, and in-place long-edge relaxation. Differential tests run the five source exports against the original chunk with indexed, mirrored, interleaved, and normalized meshes.

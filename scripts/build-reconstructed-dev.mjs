@@ -29,6 +29,7 @@ const originalCollision = join(root, 'sumiro/bundle/collision-DtBQEpmQ.js');
 const originalPlayer = join(root, 'sumiro/bundle/player-1_KrBWnI.js');
 const originalTrail = join(root, 'sumiro/bundle/trail-BFIL-IHB.js');
 const originalRenderer = join(root, 'sumiro/bundle/render_pipeline-BTCk4Dyc.js');
+const originalSight = join(root, 'sumiro/bundle/sight-DXR0ElmN.js');
 const EXPECTED_GIT_BLOBS = {
   game: '284349f2f8d0235e163f3c9b88b17ed222e3b269',
   chapters: '3da4e0f31fed783d0e548dd40fd0c1113cca16ec',
@@ -37,6 +38,7 @@ const EXPECTED_GIT_BLOBS = {
   player: '2ba1dbb18011510e025d5f3af06b045f143a3d10',
   trail: '950ee6272e85d1c446a2de97ce0df4930c6d3145',
   renderer: 'e6b0a92ac434dbae6f6ffa8227b2f09d539a594d',
+  sight: '278874e5ee81a87b366e63cd9c37d05b24448556',
 };
 const sha = data => createHash('sha1')
   .update('blob ' + Buffer.byteLength(data) + '\0')
@@ -48,7 +50,8 @@ const collision = await readFile(originalCollision);
 const player = await readFile(originalPlayer);
 const trail = await readFile(originalTrail);
 const renderer = await readFile(originalRenderer);
-for (const [name, bundle] of Object.entries({ game, chapters, kit, collision, player, trail, renderer })) {
+const sight = await readFile(originalSight);
+for (const [name, bundle] of Object.entries({ game, chapters, kit, collision, player, trail, renderer, sight })) {
   if (sha(bundle) === EXPECTED_GIT_BLOBS[name]) continue;
   throw Error('Published bundle has changed: audit integration boundaries before rebuilding');
 }
@@ -183,6 +186,11 @@ const trailAdapter = [
   "  createMovementTrail as r, trailCapsule as t } from '../../src/player/movement-trail.mjs';",
   '',
 ].join('\n');
+const sightAdapter = [
+  'export { createMeshRaycaster as a, hasLineOfSight as i, relaxLongEdgesInPlace as n,',
+  "  raycastVisibleSurface as r, filterTrianglesByMaxEdge as t } from '../../src/physics/sight.mjs';",
+  '',
+].join('\n');
 
 let rendererRewritten = renderer.toString('utf8');
 for (const [boundary, replacement] of [
@@ -221,6 +229,7 @@ await writeFile(join(output, 'sumiro/bundle/collision-DtBQEpmQ.js'), collisionRe
 await writeFile(join(output, 'sumiro/bundle/player-1_KrBWnI.js'), playerRewritten);
 await writeFile(join(output, 'sumiro/bundle/trail-BFIL-IHB.js'), trailAdapter);
 await writeFile(join(output, 'sumiro/bundle/render_pipeline-BTCk4Dyc.js'), rendererRewritten);
+await writeFile(join(output, 'sumiro/bundle/sight-DXR0ElmN.js'), sightAdapter);
 
 const report = {
   kind: 'transitional-source-backed-development-build',
@@ -233,8 +242,9 @@ const report = {
     'sumiro/bundle/player-1_KrBWnI.js',
     'sumiro/bundle/trail-BFIL-IHB.js',
     'sumiro/bundle/render_pipeline-BTCk4Dyc.js',
+    'sumiro/bundle/sight-DXR0ElmN.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mts', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts', 'src/rendering/frame-resolution.mts'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mts', 'src/physics/moving-body.mts', 'src/physics/world.mjs', 'src/physics/sight.mts', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts', 'src/rendering/frame-resolution.mts'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');
