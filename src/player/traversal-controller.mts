@@ -8,7 +8,9 @@ import {
 } from './motion-physics.mts';
 import { movementConfig as tuning } from './movement-config.mjs';
 
-type TraversalState = GroundContactState & SteeringState & AirborneState & LandingState & JumpState;
+type TraversalState = GroundContactState & SteeringState & AirborneState & LandingState & JumpState & {
+  jumpClip: 'jump_up' | 'jump_fwd';
+};
 
 type TraversalInput = Pick<InputManager, 'forward' | 'strafe' | 'jump' | 'jumpHeld' | 'walk' | 'sprint'>;
 type View = Parameters<typeof updateInputSteering<string>>[2];
@@ -27,7 +29,7 @@ export function createTraversalController(world: CollisionWorld, spawn: Readonly
     stickX: 0, stickZ: 0, stickMag: 0, stickAngle: 0, jumpBuf: 0,
     coyote: 0, fromY: ground.y, guardsInAir: false, noGrab: 0, jumpCut: false,
     fade: 0, dissolve: 0, rootY: ground.y, airDashed: false, landHeavy: false,
-    braking: false, recentSpeed: 0,
+    braking: false, recentSpeed: 0, jumpClip: 'jump_up',
   };
   const initial = { ...state };
   const bodyCapsule = { radius: tuning.radius, height: tuning.height, guards: true, solid: true };
@@ -73,6 +75,9 @@ export function createTraversalController(world: CollisionWorld, spawn: Readonly
 
   const takeoff = {
     setState: changeState,
+    play(clip: string) {
+      if (clip === 'jump_up' || clip === 'jump_fwd') state.jumpClip = clip;
+    },
     detach() {
       const { carrier } = state;
       if (!carrier) return;

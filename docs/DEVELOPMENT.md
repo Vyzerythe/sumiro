@@ -52,7 +52,7 @@ The source runtime in `src/runtime/source-runtime.mts` composes the system host,
 
 To serve the native Chapter One preview, run `npm run build:source` and serve the repository root. Open `http://localhost:8000/.local-build-source/` in a WebGPU-capable browser to inspect the GLB. Add `?walk=1` to traverse the recovered collision terrain with WASD or the arrow keys and jump with Space. This mode draws ground surfaces, uses the authored camera rail, and applies the chapter's static collision obstacles. Chapter progression still uses the transitional build.
 
-Use `?walk=1&continue=1` to read a Chapter One checkpoint from the same browser origin. The preview can resume the table and plateau shrines and leaves stored saves untouched.
+The traversal preview uses the supplied player model and its gait, jump, fall, and landing clips. Use `?walk=1&continue=1` to read a Chapter One checkpoint from the same browser origin. The preview can resume the table and plateau shrines and leaves stored saves untouched.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 
@@ -62,7 +62,7 @@ npm --prefix tests/native ci --ignore-scripts
 npm run test:gpu
 ```
 
-On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture starts a source system, loads data, advances and pauses simulation, then compares center and corner pixels at two drawing-buffer sizes. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also verifies normal encoding, surface IDs, depth, contour darkening, resize propagation, teardown, rendering of the actual Chapter One GLB, and keyboard movement on the decoded height field.
+On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture starts a source system, loads data, advances and pauses simulation, then compares center and corner pixels at two drawing-buffer sizes. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also verifies normal encoding, surface IDs, depth, contour darkening, resize propagation, teardown, rendering of the Chapter One GLB and player rig, keyboard movement and jumping, and checkpoint resume. The Node fixture omits the player GLB's embedded JPEG binding in memory. The browser loads the original GLB.
 
 ## Toolchain policy
 

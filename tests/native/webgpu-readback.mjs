@@ -313,7 +313,32 @@ try {
 }
 
 const assetURL = new URL('../../sumiro/assets/', import.meta.url);
-const chapterAssets = { assetBaseURL: assetURL, fetch: async path => new Response(await readFile(new URL(path))) };
+
+// Dawn runs in Node, which lacks the browser JPEG decoder used by GLTFLoader.
+// Keep the original GLB geometry, skin, and clips and omit the single texture binding in memory.
+function rigWithoutJpeg(bytes) {
+  const jsonEnd = 20 + bytes.readUInt32LE(12);
+  const gltf = JSON.parse(bytes.toString('utf8', 20, jsonEnd));
+  assert.equal(gltf.images[0].mimeType, 'image/jpeg');
+  delete gltf.materials[0].pbrMetallicRoughness.baseColorTexture;
+  const json = Buffer.from(JSON.stringify(gltf));
+  const paddedLength = Math.ceil(json.length / 4) * 4;
+  const headerAndJson = Buffer.alloc(20 + paddedLength, 0x20);
+  bytes.copy(headerAndJson, 0, 0, 20);
+  headerAndJson.writeUInt32LE(headerAndJson.length + bytes.length - jsonEnd, 8);
+  headerAndJson.writeUInt32LE(paddedLength, 12);
+  json.copy(headerAndJson, 20);
+  return Buffer.concat([headerAndJson, bytes.subarray(jsonEnd)]);
+}
+
+const chapterAssets = {
+  assetBaseURL: assetURL,
+  async fetch(path) {
+    const url = new URL(path);
+    const bytes = await readFile(url);
+    return new Response(url.pathname.endsWith('/player/player.glb') ? rigWithoutJpeg(bytes) : bytes);
+  },
+};
 const chapter = await createChapterPreview({
   canvas,
   viewport: { width: 96, height: 72, pixelRatio: 1 },
@@ -350,6 +375,12 @@ const traversal = await createTraversalPreview({
 try {
   const registry = traversal.context.registry;
   const spawn = registry.get('player.position');
+  const avatar = traversal.context.scene.getObjectByName('player');
+  assert.ok(avatar, 'the supplied player rig must join the scene');
+  let skin;
+  avatar.traverse(object => { if (object.isSkinnedMesh) skin = object; });
+  assert.ok(skin?.skeleton.bones.length > 0, 'the supplied model must include a live skin');
+  const initialBones = skin.skeleton.bones.map(bone => bone.quaternion.clone());
   const initialRailFrame = registry.get('camera.railFrame');
   const initialCamera = traversal.context.camera.position.clone();
   assert.equal(spawn.state, 'IDLE');
@@ -359,6 +390,16 @@ try {
   const startingPixel = await sample(48, 58);
   const skyPixel = await sample(48, 8);
   assert.ok(Math.abs(startingPixel[0] - skyPixel[0]) > 10, 'the rendered path is distinct from the sky');
+  const probePixels = [38, 44, 48, 52, 58].flatMap(x => [30, 39, 48, 56].map(y => [x, y]));
+  const withAvatar = await Promise.all(probePixels.map(([x, y]) => sample(x, y)));
+  avatar.visible = false;
+  pendingFrame(performance.now());
+  traversal.render();
+  const terrainOnly = await Promise.all(probePixels.map(([x, y]) => sample(x, y)));
+  const visibleAvatar = withAvatar.some((pixel, index) => pixel.slice(0, 3)
+    .some((channel, component) => Math.abs(channel - terrainOnly[index][component]) > 10));
+  assert.equal(visibleAvatar, true, 'the actual skinned geometry must contribute pixels to the frame');
+  avatar.visible = true;
   keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
   for (let frame = 0; frame < 60; frame++) traversal.step();
   keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyW' }));
@@ -366,6 +407,9 @@ try {
   assert.ok(movement.z < spawn.z - 3);
   assert.equal(movement.state, 'RUN');
   assert.equal(movement.grounded, true);
+  assert.deepEqual(avatar.position.toArray(), [movement.x, movement.y, movement.z]);
+  assert.ok(skin.skeleton.bones.some((bone, index) => bone.quaternion.angleTo(initialBones[index]) > 0.02),
+    'the animation mixer must change the supplied skeletal pose during locomotion');
   const walkingRailFrame = registry.get('camera.railFrame');
   assert.ok(walkingRailFrame > initialRailFrame);
   assert.ok(traversal.context.camera.position.distanceTo(initialCamera) > 1);

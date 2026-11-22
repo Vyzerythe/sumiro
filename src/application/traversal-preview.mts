@@ -1,6 +1,7 @@
-import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Group, Mesh, MeshBasicNodeMaterial, PerspectiveCamera, Scene } from 'three/webgpu';
+import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, Group, HemisphereLight, Mesh, MeshBasicNodeMaterial, PerspectiveCamera, Scene } from 'three/webgpu';
 import { installGroundAsset } from '../physics/ground-asset.mts';
 import { createCollisionWorld, type CollisionSurface, type CollisionTriangle } from '../physics/world.mts';
+import { loadAnimatedPlayer, type AnimatedPlayer } from '../player/animated-player.mts';
 import { createTraversalController } from '../player/traversal-controller.mts';
 import { createFollowCamera } from '../rendering/follow-camera.mts';
 import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
@@ -26,8 +27,10 @@ export async function createTraversalPreview({ canvas, resume, ...options }: Tra
   const spawn = resolveChapterOneSpawn(resume);
   const scene = new Scene();
   scene.background = new Color(0xc9c6bf);
+  scene.add(new HemisphereLight(0xfff1dc, 0x777571, 2.5));
   const camera = new PerspectiveCamera(52, options.viewport.width / options.viewport.height, 0.1, 100);
   let player: ReturnType<typeof createTraversalController> | undefined;
+  let visual: AnimatedPlayer | undefined;
   let cameraRig: ReturnType<typeof createFollowCamera> | undefined;
   let steering: { railYaw: number; zone: string } | null = null;
   let teleport = 0;
@@ -44,6 +47,11 @@ export async function createTraversalPreview({ canvas, resume, ...options }: Tra
           installChapterOneObstacles(world, ground);
           player = createTraversalController(world, spawn);
           cameraRig = createFollowCamera({ rail: chapterOneRail, world, wayUpAreas: chapterOneCameraAreas });
+          const actor = await loadAnimatedPlayer(context.assets, { signal: lifetime.signal });
+          lifetime.defer(() => actor.dispose());
+          lifetime.signal.throwIfAborted();
+          lifetime.ownRoot(actor.root);
+          visual = actor;
           const surfaceVertices = new Map<CollisionSurface, CollisionTriangle[]>();
           for (const triangle of world.triangles()) {
             if (triangle.kind !== 1) continue;
@@ -68,12 +76,14 @@ export async function createTraversalPreview({ canvas, resume, ...options }: Tra
           }
         },
         update(delta, context) {
-          if (!player || !cameraRig) return;
+          if (!player || !cameraRig || !visual) return;
           player.step(delta, context.input, steering);
           if (player.state.lastGroundY - player.state.y > 5.5) {
             player.reset();
             teleport++;
+            visual.reset(player.state);
           }
+          visual.update(player.state, delta);
           const { x, y, z, grounded, state, speed, lastGroundY } = player.state;
           const pose = cameraRig.update({ feet: player.state, deltaSeconds: delta, speed, teleport,
             movement: { grounded, groundY: lastGroundY } });
