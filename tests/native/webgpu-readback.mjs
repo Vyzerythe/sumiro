@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { create, globals } from 'webgpu';
 import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
-import { uniform, vec3 } from 'three/tsl';
+import { mix, uniform, vec3, vec4 } from 'three/tsl';
 import { createInkGrade } from '../../src/rendering/ink-grade.mts';
+import { configureInkSurfacePass, createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
 import { createWebGpuSurface } from '../../src/rendering/webgpu-renderer.mts';
 
 const gpu = create(process.argv.slice(2));
@@ -63,7 +64,10 @@ const scene = new Scene();
 const geometry = new PlaneGeometry(2, 2);
 const material = new MeshBasicNodeMaterial();
 const strength = uniform(1);
+const inspectNormalWeight = uniform(0);
+const inspectDepth = uniform(0);
 material.colorNode = vec3(0.25, 0.5, 1.5).mul(strength);
+material.mrtNode = createInkSurfaceOutput(0.25);
 scene.add(new Mesh(geometry, material));
 
 async function sample(x, y) {
@@ -92,7 +96,12 @@ let surface;
 try {
   surface = await createWebGpuSurface({
     canvas, scene, camera,
-    buildOutput: scenePass => createInkGrade(scenePass.getTextureNode()),
+    buildOutput(scenePass) {
+      const { color, depth, normalWeight } = configureInkSurfacePass(scenePass);
+      const normalPreview = vec4(normalWeight.r, normalWeight.b, normalWeight.a, 1);
+      const depthPreview = vec4(vec3(depth.r), 1);
+      return mix(mix(createInkGrade(color), normalPreview, inspectNormalWeight), depthPreview, inspectDepth);
+    },
   }, {
     requestAdapter: async () => ({
       async requestDevice(descriptor) {
@@ -112,6 +121,14 @@ try {
   pendingFrame(performance.now());
   surface.render();
   const resized = { center: await sample(40, 30), corner: await sample(1, 1) };
+  inspectNormalWeight.value = 1;
+  pendingFrame(performance.now());
+  surface.render();
+  const normalWeight = await sample(40, 30);
+  inspectDepth.value = 1;
+  pendingFrame(performance.now());
+  surface.render();
+  const depth = await sample(40, 30);
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
   assert.deepEqual([canvas.width, canvas.height], [80, 60]);
@@ -130,7 +147,13 @@ try {
         `frame ${index + 1} ${position}: expected ${target} ± ${tolerance}, got ${pixel}`);
     }
   }
-  console.log('Native WebGPU readback', JSON.stringify({ first, resized, expected, tolerance }));
+  const expectedNormalWeight = [188, 255, 137, 255];
+  const expectedDepth = [121, 121, 121, 255];
+  assert.ok(normalWeight.every((value, channel) => Math.abs(value - expectedNormalWeight[channel]) <= tolerance),
+    'encoded world normal and line weight ' + normalWeight);
+  assert.ok(depth.every((value, channel) => Math.abs(value - expectedDepth[channel]) <= tolerance),
+    'orthographic depth ' + depth);
+  console.log('Native WebGPU readback', JSON.stringify({ first, resized, expected, normalWeight, depth, tolerance }));
 } finally {
   geometry.dispose();
   material.dispose();

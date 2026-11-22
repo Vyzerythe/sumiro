@@ -1,10 +1,10 @@
 # Repository stabilization roadmap
 
-This plan separates what can be improved **in the published-artifact repository now** from work that depends on obtaining the original editable project. Priorities are planning guidance, not commitments or claims that work is complete.
+Rebuild this repository as a modular, readable TypeScript application on Three.js r187, WebGPU and TSL. Use the published distribution to check compatibility and improve the prototype's internal design as systems move to source.
 
 ## P0 — provenance, access, and reproducibility
 
-- [ ] Locate the canonical editable Sumiro source repository and identify its owners and maintenance responsibilities.
+- [ ] Record the provenance and maintenance owner of recovered and newly designed modules.
 - [ ] Record the exact relationship between published commits and source revisions; ensure release artifacts can be reproduced from documented commands and pinned dependencies.
 - [ ] Audit software and media ownership, applicable permissions, third-party notices, and the appropriate project license.
 - [ ] Confirm the actual GitHub Pages / hosting configuration and protected deployment process.
@@ -25,6 +25,7 @@ This plan separates what can be improved **in the published-artifact repository 
 - [x] Pin Three.js r187 and install a strict, lockfile-based TypeScript build and type-checking path.
 - [x] Replace the movement-trail chunk in the transitional build with a typed module. Verify its geometry and state against the shipped implementation.
 - [x] Recover typed frame sizing and add a native Three.js r187 renderer boundary with TSL compilation and offscreen GPU readback checks.
+- [x] Port the final grade and surface buffers to TSL. Check color, encoded normals, line weight, and depth using native GPU readback.
 - [x] Integrate chapter, save, scroll and the collision-world factory (spatial queries, raycasts, capsule sweeps, moving bodies) into a guarded, isolated development build, with differential tests.
 - [x] Reconstruct and integrate bounded player input, gait, jump/fall, low-mantle, ledge grab, hang, shimmy and climb transitions with differential tests.
 - [x] Integrate authored leap targeting, flight interpolation, interruption and landing into the source-backed development player, retaining differential parity checks.
@@ -43,5 +44,5 @@ This plan separates what can be improved **in the published-artifact repository 
 
 ## Guiding rule
 
-Never confuse a neat directory hierarchy with a reproducible software project. Recover the editable source, the build process, and the rights documentation before reorganization that could compromise the published game.
+Use reproducible builds and independent checks to establish which systems have moved to source. Keep the published reference available throughout the migration.
 

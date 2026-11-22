@@ -2,7 +2,7 @@
 
 ## What is actually versioned here
 
-The default branch `main` remains the **static published distribution** rooted at `sumiro/`. The reconstruction working branch adds readable, selectively recovered modules under `src/` and tooling under `scripts/` while retaining the same published game bytes. `sumiro/index.html` loads a hashed JavaScript entry module from `sumiro/bundle/` using relative paths. Compiled code contains the game's six-chapter progression and a browser-local save key (`sumiro.save.v1`).
+The repository includes the static published distribution under `sumiro/` and the reconstructed implementation under `src/`. The published HTML entry loads hashed JavaScript from `sumiro/bundle/`. The published distribution is the compatibility reference for the six-chapter progression, browser-local saves, and procedural behavior.
 
 ````text
 .
@@ -11,7 +11,7 @@ The default branch `main` remains the **static published distribution** rooted a
 │   ├── index.html
 │   ├── bundle/        # generated JS and Draco/WebAssembly runtime files
 │   └── assets/        # 3D models, textures, audio, and JSON data
-├── src/               # selected reconstructed domain/physics modules
+├── src/               # readable domain, physics, player and rendering modules
 ├── scripts/           # immutable-output dev assembly and bundle inventory
 ├── tests/             # artifact, parity and integration checks
 ├── docs/              # maintainer documentation
@@ -20,23 +20,25 @@ The default branch `main` remains the **static published distribution** rooted a
 
 The `assets/` hierarchy groups media by purpose (for example `audio/`, `backdrop/`, `player/`, and environment and chapter assets). `assets/audio/index.json` provides an audio index; neighboring manifests retain additional audio metadata.
 
-## What is available versus still missing
+## Execution paths
 
-- **Available on the reconstruction branch:** readable chapter/save/scroll code, collision geometry, moving-body and full collision-world query code (ground, raycast, capsule sweep, grid); executable parity comparisons with the compiled implementation; isolated development-build assembly; title-screen Chromium smoke coverage.
-- **Still missing:** the original, complete editable game source, its canonical source architecture and historical authoring files, dependency/lockfile-based application build toolchain, and a **fully source-compiled** production build.
-- **Still unverified:** representative gameplay, save/reload and chapter progression in the source-backed runtime; full browser/device compatibility; asset ownership, licenses and reproducible production output.
+| Path | Role |
+| --- | --- |
+| `sumiro/` | Published reference and deployed entry point |
+| `.local-build/` | Transitional gameplay build. Pinned adapters load readable domain, collision, player and frame-sizing code into the published runtime. |
+| `src/rendering/` | Native Three.js r187 device lifecycle, TSL surface buffers and final grade. The opt-in Dawn harness renders through these modules and reads back GPU pixels. |
 
-The release commit on `main` is labeled `Publish Sumiro build from sumiro@ccba6cf`. That string is **provenance information, not a reproducible-source link**: the referenced source tree and its workflow are not available in this repository.
+The target is a source-only TypeScript application that uses the native WebGPU renderer for gameplay. Application boot, complete scene composition, materials, remaining render effects, and end-to-end gameplay verification are still in progress.
 
 ## Stability boundaries
 
-1. Treat all files under `sumiro/bundle/` as immutable generated outputs until the upstream build is available.
+1. Preserve the generated files under `sumiro/bundle/` as the reference for differential verification.
 2. Keep `sumiro/index.html` and the `sumiro/` URL prefix consistent with relative module and asset paths.
 3. Treat binary media as shipped artifacts. Preserve names and directory layout unless the consuming code and manifests are rebuilt together.
-4. Preserve save compatibility when source work eventually resumes; existing saves are browser-local and may depend on keys and schema in the bundled code.
+4. Preserve the browser-local save keys and support stored legacy data through explicit migration.
 5. Keep quality checks honest: CI catches static integrity failures and compares selected domain behaviors; Chromium verifies boot/title availability, **not** complete gameplay parity.
 
 ## Reconstruction boundary
 
-The recovered `src/` hierarchy is intentionally incremental: domain modules and the reconstructed collision-world factory use unambiguous public interfaces and are compared against the compiled reference. The development builder copies the artifact to an ignored scratch directory and rewires only pinned, audited chunk boundaries. This is **a transitional compatibility bridge**, not a finished authoring toolchain. Future production architecture must be selected after core engine modules, dependency ownership and browser-level gameplay gates are understood.
+Keep domain and physics code independent of browser and GPU state. The renderer owns its device, render targets, and passes. Application code owns scenes and cameras. Use published-runtime comparisons to protect gameplay contracts while replacing prototype internals with typed interfaces and explicit lifecycles. Retire compatibility adapters as source modules gain their own application entry points and verification.
 
