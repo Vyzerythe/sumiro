@@ -46,6 +46,20 @@ The tests ensure that:
 
 Documentation or validation changes can be made here directly by pull request. Avoid editing hashed bundle chunks: changes will be overwritten by the next published build and may break the module graph. For behavior changes, update recovered source only after determining the relevant compatibility contract, and do not promote the development copy to production without completed gameplay regression checks and provenance.
 
+## Native WebGPU verification
+
+The TypeScript renderer owns the device, canvas configuration, scene pass, and final TSL composition. Callers own scene and camera resources and any extra passes they add. The default test suite generates WGSL with the r187 compiler and checks startup rollback and pass disposal.
+
+For device execution, install the separate Dawn test dependency and run the offscreen check:
+
+```sh
+npm ci --ignore-scripts
+npm --prefix tests/native ci --ignore-scripts
+npm run test:gpu
+```
+
+On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The check renders two frames, changes the TSL uniform and drawing-buffer size between them, compares readback against the expected colors, and checks WebGPU validation errors and disposal. This exercises the source renderer and a synthetic scene. The transitional gameplay build still uses its existing renderer.
+
 ## Toolchain policy
 
 The reconstruction pins Three.js r187, matching types, and TypeScript in its own lockfile. The compiler checks new TypeScript modules and emits browser modules into the isolated development build. It also parses the published literal import graph for `npm run inventory`. Existing JavaScript source modules still participate in the transitional build. The browser CI job installs its driver separately.

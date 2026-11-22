@@ -9,7 +9,8 @@
     "build:dev": "node scripts/build-reconstructed-dev.mjs",
     "inventory": "node scripts/inventory-bundle.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:gpu": "node tests/native/webgpu-readback.mjs"
   },
   "dependencies": {
     "three": "0.187.0"

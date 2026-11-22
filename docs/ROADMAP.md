@@ -24,6 +24,7 @@ This plan separates what can be improved **in the published-artifact repository 
 
 - [x] Pin Three.js r187 and install a strict, lockfile-based TypeScript build and type-checking path.
 - [x] Replace the movement-trail chunk in the transitional build with a typed module. Verify its geometry and state against the shipped implementation.
+- [x] Recover typed frame sizing and add a native Three.js r187 renderer boundary with TSL compilation and offscreen GPU readback checks.
 - [x] Integrate chapter, save, scroll and the collision-world factory (spatial queries, raycasts, capsule sweeps, moving bodies) into a guarded, isolated development build, with differential tests.
 - [x] Reconstruct and integrate bounded player input, gait, jump/fall, low-mantle, ledge grab, hang, shimmy and climb transitions with differential tests.
 - [x] Integrate authored leap targeting, flight interpolation, interruption and landing into the source-backed development player, retaining differential parity checks.
