@@ -231,6 +231,17 @@ if (utilityBegin < 0 || utilityEnd <= utilityBegin) {
   throw Error('Published simulation clock and registry boundary changed: re-audit');
 }
 entryRewritten = entryRewritten.slice(0, utilityBegin) + entryRewritten.slice(utilityEnd + 1);
+const loopBegin = entryRewritten.indexOf('runLive(){let{ctx:e}=this');
+const loopEnd = entryRewritten.indexOf('}_perfWarn(', loopBegin);
+if (loopBegin < 0 || loopEnd <= loopBegin) throw Error('Published live frame loop boundary changed: re-audit');
+const liveLoopAdapter = [
+  'runLive(){if(this.liveLoop)return;const{ctx}=this;ctx.smooth(ctx.camera);',
+  'this.liveLoop=startLiveLoop({fixedDt:ctx.time.fixedDt,maxFrameDt:fg.maxFrameDt,',
+  'maxStepsPerFrame:fg.maxStepsPerFrame,isPaused:()=>ctx.paused,canSubmitFrame:()=>!this._gpuBehind(),',
+  'beforeStep:()=>this._keepPrevious(),step:()=>this.step(),render:alpha=>this._renderBetween(alpha),',
+  'afterRender:timestamp=>{this._fenceFrame();if(tg.perf)this._perfWarn(timestamp)}})}',
+].join('');
+entryRewritten = entryRewritten.slice(0, loopBegin) + liveLoopAdapter + entryRewritten.slice(loopEnd + 1);
 for (const [boundary, replacement] of [
   [hostConstructor, 'createSystemHost(t,{defaultBudgetMs:fg.systemMs,initializeTimeoutMs:fg.systemInitTimeoutMs,'
     + 'now:()=>og.now(),markInitialize:name=>dg("init:"+name)})'],
@@ -238,6 +249,9 @@ for (const [boundary, replacement] of [
   ['clock:new hg(e)', 'clock:new SimulationTimeReader(e)'],
   ['registry:new gg,', 'registry:new RuntimeRegistry(),'],
   ['t._advance(),ug(t.t)', 't.advance(),ug(t.t)'],
+  ['this.pausedFrame=!1,this.fences=[]', 'this.fences=[]'],
+  ['wv(t),r.pausedFrame=!1', 'wv(t),r.liveLoop?.invalidate()'],
+  ['()=>{n.dispose(),t.input.dispose(),t.assets.dispose()}', '()=>{r.liveLoop?.stop();n.dispose();t.input.dispose();t.assets.dispose()}'],
 ]) {
   if (entryRewritten.split(boundary).length !== 2) throw Error('Published entry boundary changed: ' + boundary);
   entryRewritten = entryRewritten.replace(boundary, replacement);
@@ -245,6 +259,7 @@ for (const [boundary, replacement] of [
 entryRewritten = "import { createSystemHost } from '../../src/runtime/system-host.mjs';\n"
   + "import { FixedStepClock, SimulationTimeReader } from '../../src/runtime/fixed-step-clock.mjs';\n"
   + "import { RuntimeRegistry } from '../../src/runtime/registry.mjs';\n"
+  + "import { startLiveLoop } from '../../src/runtime/live-loop.mjs';\n"
   + entryRewritten;
 const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 
@@ -300,6 +315,8 @@ const report = {
     'src/player/movement-trail.mts',
     'src/rendering/frame-resolution.mts',
     'src/runtime/fixed-step-clock.mts',
+    'src/runtime/frame-scheduler.mts',
+    'src/runtime/live-loop.mts',
     'src/runtime/registry.mts',
     'src/runtime/system-host.mts',
   ],

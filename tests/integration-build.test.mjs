@@ -159,6 +159,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputEntry, /clock:new SimulationTimeReader\(e\)/);
     assert.match(outputEntry, /registry:new RuntimeRegistry\(\)/);
     assert.match(outputEntry, /t\.advance\(\),ug\(t\.t\)/);
+    assert.match(outputEntry, /this\.liveLoop=startLiveLoop\(/);
+    assert.match(outputEntry, /r\.liveLoop\?\.invalidate\(\)/);
+    assert.match(outputEntry, /r\.liveLoop\?\.stop\(\);n\.dispose\(\)/);
+    const { startLiveLoop } = await import(pathToFileURL(join(out, 'src/runtime/live-loop.mjs')).href);
+    assert.equal(typeof startLiveLoop, 'function');
     const { FixedStepClock } = await import(pathToFileURL(join(out, 'src/runtime/fixed-step-clock.mjs')).href);
     const { RuntimeRegistry } = await import(pathToFileURL(join(out, 'src/runtime/registry.mjs')).href);
     const clock = new FixedStepClock(60, 24);
