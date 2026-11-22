@@ -4,6 +4,7 @@ import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene }
 import { mix, uniform, vec3, vec4 } from 'three/tsl';
 import { createInkGrade } from '../../src/rendering/ink-grade.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
+import { createInkEdgeAnalysis } from '../../src/rendering/ink-edge.mts';
 import { configureInkSurfacePass, createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
 import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
 
@@ -68,6 +69,7 @@ const strength = uniform(1);
 const inspectNormalWeight = uniform(0);
 const inspectDepth = uniform(0);
 const inspectKey = uniform(0);
+const inspectEdge = uniform(0);
 material.mrtNode = createInkSurfaceOutput({ lineWeight: 0.25 });
 const background = new Mesh(geometry, material);
 const foregroundGeometry = new PlaneGeometry(0.12, 0.24);
@@ -114,8 +116,11 @@ try {
         const normalPreview = vec4(normalWeight.r, normalWeight.b, normalWeight.a, 1);
         const depthPreview = vec4(vec3(depth.r), 1);
         const keyPreview = vec4(depthKey.texture.r.div(4), depthKey.texture.g.div(4), 0, 1);
-        return mix(mix(mix(createInkGrade(color), normalPreview, inspectNormalWeight), depthPreview, inspectDepth),
-          keyPreview, inspectKey);
+        const edge = createInkEdgeAnalysis({ depth, normalWeight }, camera, { referenceHeight: 60 });
+        const edgePreview = vec4(vec3(edge.r), 1);
+        const inspection = mix(mix(mix(createInkGrade(color), normalPreview, inspectNormalWeight), depthPreview,
+          inspectDepth), keyPreview, inspectKey);
+        return mix(inspection, edgePreview, inspectEdge);
       },
     },
     systems: {
@@ -181,11 +186,20 @@ try {
   pendingFrame(performance.now());
   runtime.render();
   const key = await sample(40, 30);
+  inspectEdge.value = 1;
+  pendingFrame(performance.now());
+  runtime.render();
+  const flatEdge = await sample(10, 30);
+  let contourPeak = 0;
+  for (let x = 43; x <= 53; x++) {
+    const [level] = await sample(x, 30);
+    contourPeak = Math.max(contourPeak, level);
+  }
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
   assert.deepEqual([canvas.width, canvas.height], [80, 60]);
   assert.deepEqual([runtime.context.view.drawWidth, runtime.context.view.drawHeight], [80, 60]);
-  assert.equal(renderCallbacks, 5);
+  assert.equal(renderCallbacks, 6);
 
   // Independent CPU evaluation of the shoulder and corner curves, then sRGB.
   // A two-code-value band accommodates the bounded per-pixel dither and f16 sampling.
@@ -210,7 +224,11 @@ try {
     'orthographic depth ' + depth);
   assert.ok(key.every((value, channel) => Math.abs(value - expectedKey[channel]) <= tolerance),
     'neighboring foreground depth and surface ID ' + key);
-  console.log('Native WebGPU readback', JSON.stringify({ first, resized, expected, normalWeight, depth, key, tolerance }));
+  assert.deepEqual(flatEdge, [0, 0, 0, 255], 'a flat, constant-depth surface should have zero contour');
+  assert.ok(contourPeak >= 64, 'the near-to-far discontinuity should produce a visible contour');
+  console.log('Native WebGPU readback', JSON.stringify({
+    first, resized, expected, normalWeight, depth, key, flatEdge, contourPeak, tolerance,
+  }));
 } finally {
   depthKey?.dispose();
   geometry.dispose();

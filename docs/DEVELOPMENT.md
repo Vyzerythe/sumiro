@@ -48,7 +48,7 @@ Documentation or validation changes can be made here directly by pull request. A
 
 ## Native WebGPU verification
 
-The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and final TSL composition. Callers own the scene, camera, and additional passes. The default test suite generates WGSL with the r187 compiler and checks startup rollback and pass disposal.
+The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and final TSL composition. Callers own the scene, camera, and additional passes. The default suite checks the generated WGSL for the grade and geometric ink contours, as well as startup rollback and pass disposal.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 
@@ -58,7 +58,7 @@ npm --prefix tests/native ci --ignore-scripts
 npm run test:gpu
 ```
 
-On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture starts a source system, loads data, advances and pauses simulation, then compares center and corner pixels at two drawing-buffer sizes. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also verifies encoded world normals, line weight, depth, a neighboring surface selected by the reduced-resolution depth key, validation errors, and teardown. The transitional gameplay build still uses its existing renderer.
+On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture starts a source system, loads data, advances and pauses simulation, then compares center and corner pixels at two drawing-buffer sizes. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also checks normal encoding, discrete surface IDs, depth, a zero contour on a flat surface, a contour at a depth discontinuity, validation errors, and teardown. The transitional gameplay build still uses its existing renderer.
 
 ## Toolchain policy
 
