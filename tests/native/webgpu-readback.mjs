@@ -15,6 +15,8 @@ import { blendSeaReflection, createSeaReflectionPass } from '../../src/rendering
 import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
 import { installDracoWorker } from './draco-worker.mjs';
 import { installFixtureTextures } from './windows-textures.mjs';
+import { verifySeaExitRoute } from './sea-exit-route.mjs';
+import { verifySummitDuelRoute } from './summit-duel-route.mjs';
 
 const gpu = create(process.argv.slice(2));
 let pendingFrame;
@@ -410,6 +412,9 @@ const chapterAssets = {
     return new Response(await readFile(new URL(path)));
   },
 };
+const createRouteRuntime = options => createTraversalPreview({
+  canvas, viewport: { width: 96, height: 72, pixelRatio: 1 }, assets: chapterAssets, gpu: nativeGpu, ...options,
+});
 const chapter = await createChapterPreview({
   canvas,
   viewport: { width: 96, height: 72, pixelRatio: 1 },
@@ -436,11 +441,14 @@ try {
   await chapter.dispose();
 }
 
+const routePad = { axes: [0, 0], buttons: [{ pressed: false }] };
+const freshRun = createRunProgress({ getItem: () => null });
 const traversal = await createTraversalPreview({
   canvas,
   viewport: { width: 96, height: 72, pixelRatio: 1 },
   assets: chapterAssets,
-  input: { keyboardTarget },
+  progress: freshRun,
+  input: { keyboardTarget, getGamepads: () => [routePad] },
   gpu: nativeGpu,
 });
 try {
@@ -531,6 +539,76 @@ try {
   console.log('Chapter traversal WebGPU readback', JSON.stringify({
     spawn, movement, initialRailFrame, walkingRailFrame, jumpHeight: peak - takeoff.y, landed, startingPixel, skyPixel,
   }));
+  const feet = () => registry.get('player.position');
+  function drive(x, z, gain, jump = false) {
+    const current = feet();
+    const dx = x - current.x, dz = z - current.z;
+    const length = Math.hypot(dx, dz);
+    const yaw = registry.get('camera.steeringYaw') * Math.PI / 180;
+    const ratio = length > 0 ? gain / length : 0;
+    routePad.axes[0] = (Math.cos(yaw) * dx - Math.sin(yaw) * dz) * ratio;
+    routePad.axes[1] = (Math.sin(yaw) * dx + Math.cos(yaw) * dz) * ratio;
+    routePad.buttons[0].pressed = jump;
+    traversal.step();
+  }
+  function walkTo(x, z, radius = .25, stop = () => false) {
+    for (let step = 0; step < 800 && !stop(); step++) {
+      const remaining = Math.hypot(x - feet().x, z - feet().z);
+      if (remaining <= radius) break;
+      drive(x, z, remaining > 1.1 ? 1 : remaining > .5 ? .68 : .3);
+    }
+    assert.ok(stop() || Math.hypot(x - feet().x, z - feet().z) < radius + .17,
+      `route stalled before ${x}, ${z}: ${JSON.stringify(feet())}`);
+  }
+  for (const [x, z] of [[-1, -9], [-.9, -17], [-1.2, -25], [-1.4, -33], [-1, -38], [-.4, -41], [.1, -43]]) {
+    walkTo(x, z);
+  }
+  routePad.axes.fill(0);
+  for (let step = 0; step < 20; step++) traversal.step();
+  const launch = { x: feet().x + 4, z: feet().z - 2.31 };
+  for (let step = 0; step < 45 && (feet().x < 1.72 || feet().state !== 'RUN'); step++) drive(launch.x, launch.z, 1);
+  drive(launch.x, launch.z, 1, true);
+  assert.equal(feet().state, 'LEAP', JSON.stringify(feet()));
+  routePad.buttons[0].pressed = false;
+  routePad.axes[0] = 0;
+  routePad.axes[1] = -1;
+  const states = new Set();
+  for (let step = 0; step < 230; step++) {
+    states.add(feet().state);
+    if (states.has('CLIMB') && feet().grounded) break;
+    traversal.step();
+  }
+  routePad.axes.fill(0);
+  assert.deepEqual([...states], ['LEAP', 'GRAB', 'HANG', 'CLIMB', 'IDLE']);
+  assert.ok(feet().grounded && feet().y > 8);
+  const plateau = feet();
+  const scene = () => registry.get('story.scene');
+  for (let step = 0; step < 180 && !scene(); step++) traversal.step();
+  assert.equal(scene(), 'opening_cat');
+  const keys = keyboardDriver(traversal);
+  keys.tap('Enter');
+  assert.equal(freshRun.current.flags.cat_found, true);
+  walkTo(5.87, -59.16, 1.05);
+  routePad.axes.fill(0);
+  keys.tap('KeyE');
+  for (let step = 0; step < 420; step++) traversal.step();
+  assert.equal(freshRun.current.flags.inkStep, true);
+  let hitGate = false;
+  const unlisten = traversal.onInteraction(event => { hitGate ||= event.type === 'chapter-exit'; });
+  walkTo(12.6, -59.6, .35, () => hitGate);
+  walkTo(15.6, -62.65, .35, () => hitGate);
+  routePad.axes.fill(0);
+  unlisten();
+  assert.equal(hitGate, true, JSON.stringify(feet()));
+  await traversal.context.assets.whenIdle();
+  for (let frame = 0; frame < 120 && freshRun.current.chapter === 'ch1_climb'; frame++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(freshRun.current.chapter, 'ch2_pass');
+  pendingFrame?.(performance.now());
+  traversal.render();
+  assert.equal(registry.get('chapter.current'), 'ch2_pass');
+  console.log('Native Chapter One complete', JSON.stringify({ states: [...states], plateau, next: freshRun.current.chapter }));
 } finally {
   await traversal.dispose();
 }
@@ -672,6 +750,10 @@ try {
   resumed.step();
   const cat = resumed.context.scene.getObjectByName('companion');
   assert.ok(cat?.visible);
+  let fur;
+  cat.traverse(object => { if (object.isSkinnedMesh) fur = object.material; });
+  assert.ok(fur?.isNodeMaterial && fur.map, 'the cat uses its supplied fur texture with the native ink material');
+  assert.equal(fur.vertexColors, false, 'packed vertex paint must not color the cat red');
   assert.equal(resumed.context.registry.get('companion.state').phase, 'CARRIED');
   keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyF', repeat: false }));
   resumed.step();
@@ -819,6 +901,8 @@ try {
     assert.ok(meshes > 0, 'the actual chapter asset must decode into drawable meshes');
     const samples = [[24, 52], [36, 56], [48, 56], [60, 56], [72, 52]];
     const visible = await Promise.all(samples.map(([x, y]) => sample(x, y)));
+    if (id === 'ch6_summit') assert.ok(visible[2].slice(0, 3).every(channel => channel > 65),
+      'Summit terrain must retain diffuse ink shading: ' + visible[2]);
     root.visible = false;
     pendingFrame(performance.now());
     resumed.render();
@@ -870,6 +954,17 @@ try {
 } finally {
   await seaResume.dispose();
 }
+
+let seaExitWrite;
+const seaExitProgress = createRunProgress({
+  getItem: () => JSON.stringify({ ...createDefaultRun(), chapter: 'ch5_sea', shrine: 'before_gate', flags: { cat_found: true } }),
+  setItem(_key, value) { seaExitWrite = JSON.parse(value); },
+});
+const seaRoute = await verifySeaExitRoute({
+  createRuntime: createRouteRuntime,
+  keyboardTarget, progress: seaExitProgress, savedRun: () => seaExitWrite,
+});
+console.log('Native Sea gate to Summit', JSON.stringify(seaRoute));
 
 let pinesWrite;
 const pinesProgress = createRunProgress({
@@ -947,49 +1042,21 @@ try {
 let summitWrite;
 const summitProgress = createRunProgress({
   getItem: () => JSON.stringify({ ...createDefaultRun(), chapter: 'ch6_summit', shrine: 'arena_door',
-    flags: { ch6_duel: true, cat_found: true } }),
+    flags: { cat_found: true } }),
   setItem(_key, value) { summitWrite = JSON.parse(value); },
 });
-const summit = await createTraversalPreview({
-  canvas,
-  viewport: { width: 96, height: 72, pixelRatio: 1 },
-  assets: chapterAssets,
-  progress: summitProgress,
-  input: { keyboardTarget },
-  gpu: nativeGpu,
-});
-const summitInput = keyboardDriver(summit);
 try {
-  const { registry } = summit.context;
-  const feet = () => registry.get('player.position');
-  const scene = () => registry.get('story.scene');
-  for (const mark of [{ x: -219, z: -350 }, { x: -286, z: -350 }]) {
-    for (let step = 0; step < 1200 && !scene(); step++) {
-      if (summitInput.steer(mark, feet(), .7) <= .7) break;
-      summit.step();
-    }
-    summitInput.release();
-  }
-  assert.equal(scene(), 'reunion', JSON.stringify(feet()));
-  assert.ok(summit.context.scene.getObjectByName('family0').visible);
-  for (let step = 0; step < 45; step++) summit.step();
-  device.pushErrorScope('validation');
-  summit.render();
-  assert.equal(await device.popErrorScope(), null);
-  summitInput.tap('Enter');
-  assert.equal(scene(), null);
-  assert.ok(feet().grounded && feet().x < -288, JSON.stringify(feet()));
-  for (let step = 0; step < 680 && !summitProgress.current.flags.finished; step++) {
-    summit.step();
-    if (step % 60 === 0) await Promise.resolve();
-  }
-  assert.equal(registry.get('companion.state').phase, 'REUNITED');
-  assert.equal(summitWrite?.flags.finished, true, 'skipping the reunion should still reach the authored ending');
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(registry.get('game.completed'), true);
-  assert.equal(summit.context.paused, true, 'completion must stop traversal while the credits are open');
-  console.log('Native Summit reunion and ending', JSON.stringify({ feet: feet(), finished: summitWrite.flags.finished }));
+  const summitRoute = await verifySummitDuelRoute({
+    createRuntime: createRouteRuntime, keyboardTarget, progress: summitProgress, savedRun: () => summitWrite,
+    async inspectFrame(runtime, phase) {
+      pendingFrame?.(performance.now());
+      device.pushErrorScope('validation');
+      runtime.render();
+      const error = await device.popErrorScope();
+      assert.equal(error, null, `${phase}: ${error?.message}`);
+    },
+  });
+  console.log('Native Summit duel, reunion, and ending', JSON.stringify(summitRoute));
 } finally {
-  summitInput.release();
-  try { await summit.dispose(); } finally { fixtureTextures.restore(); restoreDraco(); }
+  try { fixtureTextures.restore(); } finally { restoreDraco(); }
 }

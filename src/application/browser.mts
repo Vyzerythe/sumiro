@@ -36,6 +36,7 @@ function viewport(element: HTMLCanvasElement) {
 const page = new AbortController();
 const listen = { signal: page.signal };
 const assetBaseURL = new URL('../sumiro/assets/', document.baseURI);
+const dracoDecoderBaseURL = new URL('../node_modules/three/examples/jsm/libs/draco/gltf/', document.baseURI);
 const query = new URLSearchParams(window.location.search);
 type Game = Awaited<ReturnType<typeof createTraversalPreview>>;
 type Runtime = Game | Awaited<ReturnType<typeof createChapterPreview>>;
@@ -158,7 +159,7 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
   let newRun: ReturnType<typeof createRunProgress> | undefined;
   let run: ReturnType<typeof createRunProgress> | undefined;
   try {
-    const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
+    const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL, dracoDecoderBaseURL } };
     if (kind === 'geometry') {
       const chapter = query.get('chapter');
       runtime = await createChapterPreview({ ...options, ...(chapter ? { chapter } : {}) });

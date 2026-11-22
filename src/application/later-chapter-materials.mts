@@ -170,6 +170,16 @@ export function createLaterChapterInkMaterial(
   if (style.color !== undefined) material.color.setHex(style.color);
   if (style.ramp) material.color.setRGB(...referenceColor(style.ramp));
   if (style.snow) material.color.setRGB(0.925, 0.915, 0.885);
+  if (chapter === 'ch6_summit') {
+    // Summit's GLBs omit PBR materials. glTF's fully metallic fallback absorbs
+    // the scene's diffuse light, while the authored ink shader uses pigment.
+    material.metalness = 0;
+    if (meshName.startsWith('trail_')) {
+      material.polygonOffset = true;
+      material.polygonOffsetFactor = -2;
+      material.polygonOffsetUnits = -4;
+    }
+  }
 
   if (paint) {
     const base = vec4(materialColor as unknown as Node<'vec4'>);

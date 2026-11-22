@@ -1,11 +1,36 @@
-import { AnimationMixer, LoopOnce, LoopRepeat, Mesh, SkinnedMesh, Vector3, type AnimationAction, type Object3D, type Skeleton } from 'three/webgpu';
+import { AnimationMixer, LoopOnce, LoopRepeat, Mesh, MeshStandardMaterial, SkinnedMesh, Vector3,
+  type AnimationAction, type Node, type Object3D, type Skeleton } from 'three/webgpu';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
+import { clamp, materialColor, mix, vec4, vertexColor } from 'three/tsl';
 import { disposeGLTF, type AssetManager } from '../assets/asset-manager.mts';
 import type { createCompanion } from '../domain/companion.mts';
+import { createInkMaterial } from '../rendering/ink-material.mts';
 import type { SystemLifetime } from '../runtime/system-host.mts';
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
 
 type CompanionState = ReturnType<typeof createCompanion>['state'];
+
+function bindFur(root: Object3D, lifetime: Pick<ChapterLifetime, 'defer'>) {
+  root.traverse(object => {
+    if (!(object instanceof SkinnedMesh) || !(object.material instanceof MeshStandardMaterial)) return;
+    const original = object.material;
+    // The shipped cat uses COLOR_0 as ink data. Its separate base texture is
+    // the painted fur, while the glTF specular extension only disables gloss.
+    const surface = new MeshStandardMaterial().copy(original);
+    surface.color.setHex(16381419);
+    surface.metalness = 0;
+    const paint = object.geometry.hasAttribute('color');
+    const fur = createInkMaterial(surface, { preset: 'cloth', vertexPaint: paint, lineWeight: 1 });
+    surface.dispose();
+    if (paint) {
+      const base = vec4(materialColor as unknown as Node<'vec4'>);
+      const cavity = mix(.47, 1, clamp(vertexColor().r, 0, 1));
+      fur.colorNode = vec4(base.rgb.mul(cavity), base.a);
+    }
+    object.material = fur;
+    lifetime.defer(() => { object.material = original; fur.dispose(); });
+  });
+}
 
 /** Owns the supplied cat rig and follows the player's animated shoulder. */
 export async function loadCompanionPresentation(assets: AssetManager, lifetime: SystemLifetime<Object3D>, player: Object3D) {
@@ -13,6 +38,7 @@ export async function loadCompanionPresentation(assets: AssetManager, lifetime: 
   const root = gltf.scene;
   lifetime.defer(() => disposeGLTF(gltf));
   lifetime.signal.throwIfAborted();
+  bindFur(root, lifetime);
   root.name = 'companion';
   root.visible = false;
   lifetime.ownRoot(root);

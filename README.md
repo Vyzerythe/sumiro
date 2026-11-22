@@ -1,8 +1,18 @@
 # Sumiro
 
-Sumiro is a browser-based 3D game spanning six chapters. **The production game in `sumiro/` is a compiled distribution.** The `work/source-reconstruction` branch contains an incremental, independently tested **reconstruction** of selected source modules, but not the original, complete upstream source project.
+Sumiro is a browser-based 3D game spanning six chapters. The native reconstruction on `main` is written in **strict TypeScript with Three.js r187, WebGPU, and TSL**. Its playable build loads the supplied models, textures, and audio from `sumiro/assets/`. The original compiled distribution is still served from `sumiro/`.
 
-> **Development status:** This branch can build a separate source-backed development copy using readable chapter, save, scroll and reconstructed collision-world modules. Most game systems are still compiled artifacts. The original authoring project, source-build toolchain, and complete gameplay parity are **not** recovered or verified. Nothing under the published `sumiro/` directory is modified.
+## Run the native source build
+
+```sh
+npm ci
+npm run build:source
+python3 -m http.server 8000
+```
+
+Open [the native game](http://localhost:8000/.local-build-source/) in a WebGPU-capable browser. The title menu starts a new run or resumes a stored checkpoint. Native sessions use their own save slot and can read the shipped save formats. See [Development and validation](docs/DEVELOPMENT.md) for controls and the hardware test.
+
+The native application has all six chapter worlds, authored traversal and cameras, combat, shrines, collectible scrolls, and progression through the ending. The checks cover connected routes and separate checkpoint approaches. A continuous six-chapter run and detailed audiovisual parity are still open.
 
 ## Run the published build locally
 
@@ -19,13 +29,17 @@ Use HTTP rather than opening `index.html` via `file://`: module loading and asse
 | `sumiro/index.html` | Game entry point and loading screen |
 | `sumiro/bundle/` | Generated, content-hashed JavaScript and WASM runtime assets |
 | `sumiro/assets/` | Game models, textures, audio, and JSON asset data |
-| `src/domain/` | Reconstructed chapter, save, and scroll game logic |
+| `src/application/` | Native browser entry, chapter assembly, mechanisms, interactions, and story presentation |
+| `src/domain/` | Chapter, save, vitals, companion, and scroll logic |
 | `src/physics/` | Reconstructed collision world, raycasts, capsule sweeps, spatial grid and moving-body logic |
-| `src/player/` | Source-backed player input steering, cinematic timing and ledge-path interpolation (not full locomotion) |
-| `scripts/build-reconstructed-dev.mjs` | Guarded, isolated source-backed development build |
+| `src/player/` | Locomotion, ledge traversal, Ink Step, animation, and input steering |
+| `src/combat/` | Player sword actions, encounter state, enemy behavior, and crow swarms |
+| `src/rendering/` | Native WebGPU renderer, TSL ink passes, material adapters, and backdrop |
+| `scripts/build-native-preview.mjs` | Compiles the source-only browser application |
+| `scripts/build-reconstructed-dev.mjs` | Builds the separate transitional distribution |
 | `scripts/browser-smoke.mjs` | Chromium boot/title comparison against the published game |
 | `.nojekyll` | Bypasses Jekyll processing on compatible static hosting |
-| `tests/` | Distribution integrity, differential behavioral parity and development-build checks (not full gameplay tests) |
+| `tests/` | Distribution integrity, source parity, gameplay route tests, and native WebGPU readbacks |
 | `.github/workflows/` | Automated repository validation |
 | `docs/` | Architecture, development, deployment, licensing, and release guidance |
 
@@ -39,12 +53,13 @@ Use Node.js 22.18 or newer for source development.
 npm ci
 npm run typecheck
 npm test
+npm run build:source
 npm run build:dev
 ```
 
 Serve `.local-build/` over HTTP and visit `/sumiro/` to run the transitional build. It compiles recovered TypeScript and uses adapters to load recovered modules into the published runtime. Keep production deployments on the published distribution while reconstruction is in progress.
 
-The target source stack is strict TypeScript and Three.js r187 with WebGPU and TSL. The development build currently uses the shipped WebGL renderer for compatibility while the types and application modules are recovered.
+The transitional build uses the shipped WebGL renderer. The native source build initializes WebGPU directly and has a separate hardware-only verification command.
 
 GitHub Actions also runs a Chromium comparison of the published and development builds through the title screen. It does **not** prove gameplay/save-reload parity; the New Game transition test remains a documented opt-in diagnostic. See [source-backed build and test limitations](docs/SOURCE_BACKED_DEV_BUILD.md) and [release checks](docs/RELEASE_CHECKLIST.md).
 

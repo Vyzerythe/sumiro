@@ -93,9 +93,10 @@ test('all supplied later chapter GLB primitives match the authored selectors and
   assert.equal(resolveLaterChapterInkMaterial('ch4_temple', 't_glow_a1').unlit, true);
 });
 
-test('the native Summit snow shader uses paint as a hollow and line mask', () => {
-  const source = new MeshStandardMaterial({ vertexColors: true });
+test('the native Summit snow shader uses diffuse pigment with the authored hollow and line masks', () => {
+  const source = new MeshStandardMaterial({ vertexColors: true, metalness: 1 });
   const material = createLaterChapterInkMaterial(source, 'ch6_summit', 'snow_a1');
+  const trail = createLaterChapterInkMaterial(source, 'ch6_summit', 'trail_a0');
   const geometry = new PlaneGeometry();
   geometry.setAttribute('color', new Uint16BufferAttribute([
     65535,0,0,65535, 32768,0,0,32768, 65535,0,0,65535, 0,0,0,0,
@@ -111,7 +112,10 @@ test('the native Summit snow shader uses paint as a hollow and line mask', () =>
   renderer.setMRT(scenePass.getMRT());
   try {
     assert.equal(source.vertexColors, true);
+    assert.equal(source.metalness, 1);
     assert.equal(material.vertexColors, false);
+    assert.equal(material.metalness, 0);
+    assert.deepEqual([trail.polygonOffset, trail.polygonOffsetFactor, trail.polygonOffsetUnits], [true, -2, -4]);
     assert.deepEqual(material.color.toArray(), [0.925, 0.915, 0.885]);
     const builder = new WGSLNodeBuilder(new Mesh(geometry, material), renderer);
     builder.scene = scene;
@@ -121,6 +125,7 @@ test('the native Summit snow shader uses paint as a hollow and line mask', () =>
     assert.match(builder.fragmentShader, /normalWorld \* .*clamp\( \w+\.w, 0\.0, 1\.0 \) \* 0\.9/);
   } finally {
     material.dispose();
+    trail.dispose();
     source.dispose();
     geometry.dispose();
     scenePass.dispose();

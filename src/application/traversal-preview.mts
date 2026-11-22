@@ -36,6 +36,7 @@ import { getStaticChapter } from './static-chapter-catalog.mts';
 import { createLaterChapterCamera } from './later-chapter-camera.mts';
 import { createStoryPresentation } from './story-presentation.mts';
 import { createStoryBeats } from './story-beats.mts';
+import { mountSummitFinale, summitHaiku } from './summit-finale.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 interface TraversalPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'audio' | 'gpu' | 'input' | 'viewport'> {
@@ -53,6 +54,7 @@ interface TraversalChapter {
   view: ReturnType<typeof createChapterOneCamera> | ReturnType<typeof createLaterChapterCamera>;
   story?: ReturnType<typeof createChapterOneInteractions>;
   cutscene?: ReturnType<typeof createStoryPresentation>;
+  finale?: ReturnType<typeof mountSummitFinale>;
   updateEnvironment?: Awaited<ReturnType<typeof loadChapterOneTraversalScene>>['updateEnvironment'];
   updateLandmarks?: Awaited<ReturnType<typeof loadChapterOneTraversalScene>>['updateLandmarks'];
   backdrop?: ChapterOneBackdrop;
@@ -110,6 +112,14 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
   let interactionPrompt: string | null = null;
   let lifetimeSignal: AbortSignal | undefined;
 
+  function playGameplayCue(name: string, signal = lifetimeSignal, pitch?: number) {
+    if (name === 'gate') {
+      void audioCues?.play('gate');
+    } else audioCues?.playGameplay(name, {
+      ...(signal ? { signal } : {}), ...(pitch !== undefined ? { pitch } : {}),
+    });
+  }
+
   function publishVitals(context: SourceRuntimeContext, refill = false) {
     const { scrolls, options } = progress.current;
     if (refill) vitals.refill(scrolls.length, options.assist === true);
@@ -131,7 +141,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     return { x, y, z, heading, state, grounded, speed: Math.hypot(vx, vz), onCarrier: carrier !== null };
   }
 
-  function applyView({ player, view, lateMechanisms, updateEnvironment, cutscene }: TraversalChapter, delta: number, context: SourceRuntimeContext) {
+  function applyView({ player, view, lateMechanisms, updateEnvironment, cutscene, finale, exit }: TraversalChapter, delta: number, context: SourceRuntimeContext) {
     const water = lateMechanisms?.sea;
     sea.enabled.value = water !== undefined;
     if (water) {
@@ -141,6 +151,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
       seaReflection?.update(water.level, water.seconds);
     }
     const { x, y, z, grounded, state } = player.state;
+    finale?.update(delta, x, progress.current.flags.ch6_duel === true, exit?.finishing === true);
     const pose = view(player.state, delta, teleport);
     steering = { railYaw: 'railYaw' in pose ? pose.railYaw : pose.yaw, zone: pose.zone };
     camera.position.set(pose.x, pose.y, pose.z);
@@ -159,7 +170,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     if (active !== current) {
       active = current;
       teleport++;
-      camera.far = current.id === 'ch5_sea' ? 800 : 100;
+      camera.far = current.id === 'ch6_summit' ? 1800 : current.id === 'ch5_sea' ? 800 : 100;
       camera.updateProjectionMatrix();
       publishVitals(context, true);
       visual.reset(current.data.player.state);
@@ -192,6 +203,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     data.player.reset(resolveChapterSpawn(progress.current.chapter, data.origin, progress.current, data.world));
     data.companion.reset(companionPlayer(data.player));
     data.story?.enter(progress.current);
+    data.finale?.reset();
     if (data.story) data.updateLandmarks?.(0, data.story.gatePhase);
     data.collectibles.sync(progress.current);
     teleport++;
@@ -328,6 +340,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                 const spawn = resolveChapterSpawn(id, chapterOneSpawn, resumeState, world);
                 const player = createTraversalController(world, spawn, {
                   ledges: chapterOneLedges, leapLinks: chapterOneLeapLinks, duration: actor.duration, canInkStep,
+                  onInkStep: () => playGameplayCue('inkStep', resources.signal),
                 });
                 const story = createChapterOneInteractions({
                   groundHeightAt: (x, z) => world.groundAt(x, z)?.y ?? null,
@@ -366,7 +379,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                 onEvent(event) {
                   if (event.type === 'hint') context.registry.set('chapter.interaction', event);
                   else context.registry.set('chapter.mechanism', event);
-                  if (event.type === 'cue' && event.name === 'gate') void audioCues?.play('gate');
+                  if (event.type === 'cue') playGameplayCue(event.name, resources.signal);
                 },
               });
               let mechanisms: TraversalChapter['mechanisms'];
@@ -377,6 +390,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                   onEvent(event) {
                     if (event.type === 'hint') context.registry.set('chapter.interaction', event);
                     else context.registry.set('chapter.mechanism', event);
+                    if (event.type === 'cue') playGameplayCue(event.name, resources.signal, 'pitch' in event ? event.pitch : undefined);
                   },
                 });
                 resources.defer(() => driver.dispose());
@@ -391,11 +405,15 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
               const traversal = definition.createTraversal(world);
               const spawn = resolveChapterSpawn(id, origin, resumeState, world);
               const player = createTraversalController(world, spawn, { ...traversal, duration: actor.duration, canInkStep,
-                ...(lateMechanisms?.inkStep ? { onInkStep: lateMechanisms.inkStep } : {}) });
+                onInkStep() {
+                  lateMechanisms?.inkStep?.();
+                  playGameplayCue('inkStep', resources.signal);
+                },
+              });
               combat = await loadEncounterCombat({ id, assets: context.assets, lifetime: resources, world, root, player,
                 progress, health: vitals, duration: actor.duration, ...(random ? { random } : {}),
                 onCue(name) {
-                  if (name === 'gate' && id !== 'ch5_sea') void audioCues?.play('gate');
+                  if (name !== 'gate' || id !== 'ch5_sea') playGameplayCue(name, resources.signal);
                   context.registry.set('combat.cue', name);
                 },
                 onHint(text, ms) { context.registry.set('chapter.interaction', { type: 'hint', text, ms }); },
@@ -412,13 +430,14 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                     context.registry.set('chapter.interaction', {
                       type: 'hint', text: 'J or left mouse to strike · K or right mouse to parry', ms: 5000,
                     } satisfies ChapterOneInteractionEvent);
-                  } else if (event.type === 'cue' && event.name === 'gate') void audioCues?.play('gate');
+                  } else if (event.type === 'cue') playGameplayCue(event.name, resources.signal);
                 }, random, vitals);
                 root.add(duel.root);
               }
               const partner = companion(world);
               const cutscene = id === 'ch6_summit' || id === 'ch3_pines'
                 ? scenePresentation(id === 'ch6_summit' ? 'reunion' : null, root, world, player, partner) : undefined;
+              const finale = id === 'ch6_summit' ? mountSummitFinale(root, resources) : undefined;
               return { root, data: { world, origin, player, companion: partner, collectibles,
                 view: createLaterChapterCamera(world, id, {
                   root,
@@ -433,7 +452,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                 checkpoints: createCheckpointInteraction(id, world, progress),
                 ...(mechanisms ? { mechanisms } : {}), ...(duel ? { duel } : {}), ...(exit ? { exit } : {}),
                 ...(iceHolds ? { iceHolds } : {}), ...(lateMechanisms ? { lateMechanisms } : {}),
-                ...(combat ? { combat } : {}), ...(cutscene ? { cutscene } : {}) } };
+                ...(combat ? { combat } : {}), ...(cutscene ? { cutscene } : {}), ...(finale ? { finale } : {}) } };
             },
           });
           const manager = chapters;
@@ -486,7 +505,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
             !exit?.finishing && player.state.grounded && drinkStances.has(player.state.state)) {
             if (vitals.snapshot().drinks === 0) {
               context.registry.set('chapter.interaction', { type: 'hint', text: 'The gourd is dry. A lantern will refill it.', ms: 2600 });
-            } else vitals.beginDrink(visual.duration('drink'));
+            } else if (vitals.beginDrink(visual.duration('drink'))) playGameplayCue('drink');
           }
           if (!fell && !vitals.drinking && (!combatAction || combatAction === 'IDLE') && !exit?.finishing) {
             player.step(delta, context.input, steering);
@@ -554,8 +573,13 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
               context.registry.set('chapter.interaction', { type: 'hint', text: 'The lantern is lit.', ms: 3800 });
             }
           }
-          if ((current.id !== 'ch6_summit' || cutscene?.complete) && exit?.update(delta, player.state, progress.current.flags)) {
-            requestNextChapter(context, exit);
+          if (exit && (current.id !== 'ch6_summit' || cutscene?.complete)) {
+            const before = exit.elapsed;
+            if (exit.update(delta, player.state, progress.current.flags)) requestNextChapter(context, exit);
+            if (current.data.finale && before === 0 && exit.finishing) void audioCues?.play('scroll');
+            if (current.data.finale && before <= 2.2 && exit.elapsed > 2.2) {
+              context.registry.set('chapter.interaction', { type: 'hint', text: summitHaiku.join('\n'), ms: 8000 });
+            }
           }
           beats?.step(delta, { playing: true, sceneActive: cutscene?.active === true,
             subtitleActive: Boolean(context.registry.get('story.subtitle')), fighting, player: player.state,

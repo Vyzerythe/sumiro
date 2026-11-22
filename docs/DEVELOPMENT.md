@@ -54,6 +54,8 @@ To serve the native application, run `npm run build:source` and serve the reposi
 
 The title-menu game writes to `sumiro.native.save.v1`. Continue can read either shipped save format from the same browser origin. Use `?walk=1&continue=1` for a read-only preview that resolves the authored shrine stand. The native tests inject a writable store to verify explicit shrine interaction saves in Chapters One and Five.
 
+The browser loads the installed Three.js Draco decoder from the same origin as the native build. Serve the repository root so the compiled entry can reach `node_modules/three/` and `sumiro/assets/`.
+
 The native runtime advances the Pines bridges, crumbles, tilting platforms and gusts, the Temple bells and lifts, the Sea tide, veils and floating carriers, and the Summit lift, ice holds and wind. Sea water uses a TSL shoreline pass and an isolated reflection pass that samples the completed land depth. Chapters Two through Six use their authored camera zones. The native encounter controller plays the authored wraith, archer and ronin waves. All six chapters have their shrine models and collectible scrolls. F picks up or sets down the cat, which follows the recorded ground trail when set down. The opening and reunion scenes use the supplied actor rigs and dialogue. The credits display the run's scrolls and time on the road. Detailed pose and material parity, several chapter-specific effects, and a continuous end-to-end playthrough remain open.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
@@ -65,6 +67,8 @@ npm run test:gpu
 ```
 
 On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture requires a hardware adapter. It verifies resize and teardown, compares rendered pixels against an independent grade calculation, and checks normal encoding, surface IDs, depth, contour darkening, the Chapter Two terrain palette, and Sea reflection occlusion. It also exercises walking and jumping, checkpoint writes and restart, pickup and carry, the first Court and Pines encounters, timed gourd recovery, transactional chapter swaps, and readback from every chapter. It plays the Chapter One cat scene, learns Ink Step from the pool, and walks through the gate into Chapter Two. It walks from the Summit arena checkpoint to the reunion, skips the scene, and checks that the game saves completion and enters the credits state. The fixture uses the installed Three.js Draco decoder through a Node worker. On Windows, PowerShell with System.Drawing decodes the PNG and JPEG files, and ImageMagick's `magick` command decodes the WebP files. On other platforms the fixture supplies flat textures, so it does not establish image fidelity there.
+
+The route checks include a fresh Chapter One run through the gate, the Sea's low-tide veil and two final encounter waves, and all three phases of the final Ronin fight before the Summit reunion, red sun, closing haiku, and credits. Separate CPU replays cover Chapter Two's major ledge sequences, the late Pines and Temple exits, and the opening Summit ice and cornice route. The later tests start at authored checkpoints or named course positions.
 
 ## Toolchain policy
 

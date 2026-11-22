@@ -27,6 +27,7 @@ export function createChapterExit(id: string) {
   let used = false;
   return {
     get finishing() { return finishing; },
+    get elapsed() { return elapsed; },
     update(delta: number, feet: Readonly<{ x: number; z: number; grounded: boolean }>, flags: Readonly<Record<string, unknown>>) {
       if (!Number.isFinite(delta) || delta < 0) throw RangeError('Exit step must be finite and nonnegative');
       if (used || delta === 0) return false;
