@@ -44,7 +44,6 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputChapters, /src\/domain\/chapters\.mjs/);
     assert.match(outputKit, /src\/domain\/scrolls\.mjs/);
     assert.match(outputCollision, /src\/physics\/geometry\.mjs/);
-    assert.match(outputCollision, /src\/physics\/moving-body\.mjs/);
     assert.match(outputCollision, /src\/physics\/world\.mjs/);
     assert.match(outputPlayer, /src\/player\/cinematic-timeline\.mjs/);
     assert.match(outputPlayer, /src\/player\/ledge-path\.mjs/);
@@ -91,6 +90,10 @@ test('source-backed build preserves originals and binds live domain imports', as
     const geometry = await import(pathToFileURL(join(out,'src/physics/geometry.mjs')).href);
     assert.equal(geometry.pointInPolygon(3, 3, [[0,0],[5,0],[5,5],[0,5]]), true);
     const collisionAdapter = await import(pathToFileURL(join(out,collision)).href);
+    const world = await import(pathToFileURL(join(out,'src/physics/world.mjs')).href);
+    assert.deepEqual({ ...collisionAdapter }, {
+      n: geometry.extrudeWallPolyline, r: geometry.pointInPolygon, t: world.createCollisionWorld,
+    });
     assert.equal(collisionAdapter.r(3, 3, [[0,0],[5,0],[5,5],[0,5]]), true);
     const movingWorld = collisionAdapter.t();
     const movingBody = movingWorld.addBody('test', [{positions:[0,0,0, 1,0,0, 0,0,1]}]);

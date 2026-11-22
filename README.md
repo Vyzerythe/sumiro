@@ -48,7 +48,7 @@ The target source stack is strict TypeScript and Three.js r187 with WebGPU and T
 
 GitHub Actions also runs a Chromium comparison of the published and development builds through the title screen. It does **not** prove gameplay/save-reload parity; the New Game transition test remains a documented opt-in diagnostic. See [source-backed build and test limitations](docs/SOURCE_BACKED_DEV_BUILD.md) and [release checks](docs/RELEASE_CHECKLIST.md).
 
-For a reproducible inventory of the generated JS module graph, run `node scripts/inventory-bundle.mjs > bundle-inventory.json`; the output is a local, read-only report, not recovered source.
+Run `npm run --silent inventory` for the published JavaScript import graph, adapter source paths, and coverage by chunk. The inventory checks each adapted chunk against its pinned Git blob.
 
 ## Documentation
 
