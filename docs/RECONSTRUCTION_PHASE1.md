@@ -33,7 +33,7 @@ This proves only the tested chapter-domain behavior. It is **not** proof of a fu
 ## Subsequent reconstructed slices
 
 - Save-data defaults, migration and storage compatibility: implemented under `src/domain/save.mjs`.
-- Scroll catalog and assignments: implemented under `src/domain/scrolls.mjs`.
+- Scroll catalog and assignments: implemented under `src/domain/scrolls.mts`.
 - Collision polygon/wall geometry and moving-body transforms: implemented under `src/physics/`.
 - **Remaining:** game-state and UI contracts, collision-world spatial queries, player/scene/render/audio subsystems, and complete gameplay regression automation.
 - A full reproducible source-only build is **not** available; the current adapter-based development build is an intermediate step.

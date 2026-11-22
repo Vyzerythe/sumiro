@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
-import { createLedgePath } from '../src/player/ledge-path.mjs';
-import { alignToLedge, beginLedgeGrab, detectLedgeGrab } from '../src/player/ledge-grab.mjs';
+import { createLedgePath } from '../src/player/ledge-path.mts';
+import { alignToLedge, beginLedgeGrab, detectLedgeGrab } from '../src/player/ledge-grab.mts';
 
 const source = await readFile(
   new URL('../sumiro/bundle/player-1_KrBWnI.js', import.meta.url), 'utf8',

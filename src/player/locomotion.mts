@@ -4,7 +4,7 @@
  * Preserve the published thresholds, input fallbacks and in-place mutations.
  */
 
-import type { movementConfig } from './movement-config.mjs';
+import type { movementConfig } from './movement-config.mts';
 
 type MovementConfig = typeof movementConfig;
 

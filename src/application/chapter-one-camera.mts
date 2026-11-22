@@ -13,10 +13,11 @@ export function createChapterOneCamera(world: CollisionWorld, climbDuration: num
   return (feet: PlayerState, deltaSeconds: number, teleport: number) => {
     const { grounded, state, speed, lastGroundY, leap, ledge, stateT } = feet;
     let frameTarget: number | undefined;
-    if (state === 'LEAP' && leap?.link.camera && 'toF' in leap.link.camera) {
+    const target = leap?.link.camera?.toF;
+    if (state === 'LEAP' && leap && target !== undefined) {
       if (lastTraversalState !== 'LEAP') leapStartFrame = railFrame;
       const fraction = Math.min(stateT / leap.time, 1);
-      frameTarget = leapStartFrame + (leap.link.camera.toF - leapStartFrame) * fraction;
+      frameTarget = leapStartFrame + (target - leapStartFrame) * fraction;
     } else if (ledge?.id === 'rim_front' || ledge?.id === 'crack') {
       const climb = state === 'CLIMB' ? Math.min(stateT / climbDuration, 1) : 0;
       frameTarget = 228 + 30 * climb;

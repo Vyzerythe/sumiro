@@ -1,6 +1,6 @@
 /** Story interaction rules from the shipped Chapter One, game, kit, and layout bundles. */
 import type { createRunProgress } from '../domain/run-progress.mts';
-import { scrollCount, scrollTexts } from '../domain/scrolls.mjs';
+import { scrollCount, scrollTexts } from '../domain/scrolls.mts';
 import { pointInPolygon, type PointXZ } from '../physics/geometry.mts';
 
 export const chapterOneInteractionSites = {

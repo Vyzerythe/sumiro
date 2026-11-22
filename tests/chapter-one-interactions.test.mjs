@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { chapterOneInteractionSites, createChapterOneInteractions } from '../src/application/chapter-one-interactions.mts';
 import { createRunProgress } from '../src/domain/run-progress.mts';
-import { scrollCount, scrollTexts } from '../src/domain/scrolls.mjs';
+import { scrollCount, scrollTexts } from '../src/domain/scrolls.mts';
 import { t as publishedPool, n as publishedPoolRadius } from '../sumiro/bundle/layout-BxJUyHwJ.js';
 import { i as gateWorld } from '../sumiro/bundle/layout-BFL31pIQ.js';
 

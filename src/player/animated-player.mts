@@ -3,7 +3,7 @@ import { AnimationMixer, Mesh, SkinnedMesh } from 'three';
 import type { AnimationAction, Group, Skeleton } from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { disposeGLTF, type AssetManager, type AssetRequestOptions } from '../assets/asset-manager.mts';
-import { movementConfig as tuning } from './movement-config.mjs';
+import { movementConfig as tuning } from './movement-config.mts';
 import type { createTraversalController } from './traversal-controller.mts';
 
 type TraversalState = ReturnType<typeof createTraversalController>['state'];

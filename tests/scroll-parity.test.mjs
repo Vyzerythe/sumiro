@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
 import { chapters } from "../src/domain/chapters.mts";
-import { scrollTexts, scrollCount, scrollsByChapter } from "../src/domain/scrolls.mjs";
+import { scrollTexts, scrollCount, scrollsByChapter } from "../src/domain/scrolls.mts";
 
 const source = await readFile(new URL("../sumiro/bundle/kit-B01EgPBo.js", import.meta.url), "utf8");
 const matched = source.match(/var C=(\{[\s\S]*?\}),w=Object\.keys\(C\)\.length,T=(\{[\s\S]*?\}),E=\{preset:/);

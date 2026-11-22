@@ -6,20 +6,84 @@
  * animation timing, platform transport, mantle) remain injected at the
  * boundary. This preserves the shipped order and thresholds.
  */
+import type { CollisionPosition, CollisionSurface } from '../physics/world.mts';
+import type { LedgeCarrier, SampledLedge } from './ledge-grab.mts';
+import type { LedgeSample } from './ledge-path.mts';
 
-const clamp = (value, low, high) => Math.min(Math.max(value, low), high);
+interface ShimmyHold { key: number; dir: number }
+
+export interface LedgeShimmyState {
+  ledge: (SampledLedge & { length: number }) | null;
+  ledgeS: number;
+  shimmyHold: ShimmyHold | null;
+  state: string;
+}
+
+export interface LedgeHangState {
+  ledge: { body?: LedgeCarrier | null } | null;
+  shimmyHold: ShimmyHold | null;
+  state: string;
+  stateT: number;
+  y: number;
+  lastGroundY: number;
+  hangBackFresh: boolean;
+  hangForward: number;
+  hangBack: number;
+  jumpBuf: number;
+}
+
+export interface LedgeHangActions {
+  drop(): void;
+  align(): void;
+  changeState(state: 'HANG'): void;
+  leapBack(): void;
+  leapSide(direction: number, vertical: number): boolean;
+  climbOrLeap(): void;
+  shimmy(elapsed: number, input: number): void;
+}
+
+export interface LedgeClimbState<Body, Surface extends CollisionSurface> extends CollisionPosition {
+  heading: number;
+  rootY: number;
+  ledge: SampledLedge | null;
+  grounded: boolean;
+  surface: Surface;
+  carrier: Body | null;
+  lastGroundY: number;
+  fromY: number;
+}
+
+interface ClimbAnimation {
+  key(): number;
+  finished(): boolean;
+  gait: { idleT: number };
+  playGait(value: number): void;
+}
+
+interface ClimbWorld<Body> {
+  groundAt(x: number, z: number, maxY: number, minY: number): { y: number; surface: CollisionSurface; body: Body | null } | null;
+}
+
+interface ClimbOptions<Surface extends CollisionSurface> {
+  forwardOffset: number;
+  heightGain: number;
+  surface(value: CollisionSurface): Surface;
+}
+
+const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high);
 
 /** Shift an attached player along the ledge's local arc-length coordinates. */
 export function shimmyAlongLedge(
-  state, directionInput, elapsed, railYaw, shimmyRate, align, changeState,
-) {
-  const behind = {};
-  const ahead = {};
-  state.ledge.at(state.ledgeS - .05, behind);
-  state.ledge.at(state.ledgeS + .05, ahead);
+  state: LedgeShimmyState, directionInput: number, elapsed: number, railYaw: number | null | undefined,
+  shimmyRate: number, align: () => void, changeState: (state: 'SHIMMY') => void,
+): void {
+  const behind: Partial<LedgeSample> = {};
+  const ahead: Partial<LedgeSample> = {};
+  state.ledge!.at(state.ledgeS - .05, behind);
+  state.ledge!.at(state.ledgeS + .05, ahead);
 
-  const tangentX = ahead.x - behind.x;
-  const tangentZ = ahead.z - behind.z;
+  const tangentX = ahead.x! - behind.x!;
+  const tangentZ = ahead.z! - behind.z!;
   const cameraAngle = (railYaw ?? 0) * (Math.PI / 180);
   const projected = tangentX * Math.cos(cameraAngle) - tangentZ * Math.sin(cameraAngle);
   const inputSign = Math.sign(directionInput);
@@ -35,7 +99,7 @@ export function shimmyAlongLedge(
   const next = clamp(
     state.ledgeS + Math.sign(direction) * travel * elapsed,
     0,
-    state.ledge.length,
+    state.ledge!.length,
   );
 
   if (state.state !== 'SHIMMY') changeState('SHIMMY');
@@ -50,12 +114,13 @@ export function shimmyAlongLedge(
  * carrier loss > initial grab wait > buffered jump > forward climb >
  * backward drop > shimmy > hanging idle.
  */
-export function updateLedgeHang(state, input, elapsed, animationWait, actions) {
+export function updateLedgeHang(state: LedgeHangState, input: { forward: number; strafe: number },
+  elapsed: number, animationWait: number, actions: LedgeHangActions): void {
   const forward = input.forward;
   const strafe = input.strafe;
 
-  if (state.ledge.body) {
-    if (!state.ledge.body.enabled) {
+  if (state.ledge!.body) {
+    if (!state.ledge!.body.enabled) {
       actions.drop();
       return;
     }
@@ -100,9 +165,10 @@ export function updateLedgeHang(state, input, elapsed, animationWait, actions) {
 }
 
 /** Preserve completion offsets and carrier/ground decisions after CLIMB. */
-export function completeLedgeClimb(
-  state, view, animation, world, options, changeState,
-) {
+export function completeLedgeClimb<Body, Surface extends CollisionSurface>(
+  state: LedgeClimbState<Body, Surface>, view: { kind: string | null; p: number }, animation: ClimbAnimation,
+  world: ClimbWorld<Body>, options: ClimbOptions<Surface>, changeState: (state: 'IDLE') => void,
+): void {
   view.p = Math.min(animation.key() / 30, 1);
   if (!animation.finished()) return;
   const forwardX = -Math.sin(state.heading);

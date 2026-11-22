@@ -6,7 +6,7 @@
  */
 import type { MovingTriangleBody } from '../physics/moving-body.mts';
 import type { CapsuleHit, CapsuleOptions, CollisionPosition, CollisionSurface, CollisionWorld } from '../physics/world.mts';
-import type { movementConfig } from './movement-config.mjs';
+import type { movementConfig } from './movement-config.mts';
 
 type MovementConfig = typeof movementConfig;
 type ChangeState = (state: string) => void;

@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
-import { createLedgePath } from '../src/player/ledge-path.mjs';
+import { createLedgePath } from '../src/player/ledge-path.mts';
 import {
   shimmyAlongLedge, updateLedgeHang, completeLedgeClimb,
-} from '../src/player/ledge-controller.mjs';
+} from '../src/player/ledge-controller.mts';
 
 const bundle=await readFile(new URL('../sumiro/bundle/player-1_KrBWnI.js',import.meta.url),'utf8');
 function slice(pattern,label) {

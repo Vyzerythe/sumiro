@@ -66,5 +66,5 @@ On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 bac
 
 ## Toolchain policy
 
-The reconstruction pins Three.js r187, matching types, and TypeScript in its own lockfile. The compiler checks new TypeScript modules and emits browser modules into the isolated development build. It also parses the published literal import graph for `npm run inventory`. Existing JavaScript source modules still participate in the transitional build. The browser CI job installs its driver separately.
+The reconstruction pins Three.js r187, matching types, and TypeScript in its own lockfile. The compiler checks all application modules under `src/` with strict TypeScript and emits browser JavaScript. An integration test resolves the emitted native import map and literal module graph without depending on a published game chunk. `npm run inventory` reports coverage in the separate transitional build.
 

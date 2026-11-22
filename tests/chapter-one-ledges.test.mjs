@@ -6,9 +6,9 @@ import { installChapterOneObstacles } from '../src/application/chapter-one-obsta
 import { chapterOneGroundRegions } from '../src/application/chapter-one-terrain.mts';
 import { installGroundAsset } from '../src/physics/ground-asset.mts';
 import { createCollisionWorld } from '../src/physics/world.mts';
-import { detectLedgeGrab } from '../src/player/ledge-grab.mjs';
-import { createLedgePath } from '../src/player/ledge-path.mjs';
-import { findLeapLink, resolveLeapRim, resolveLeapTarget } from '../src/player/leap.mjs';
+import { detectLedgeGrab } from '../src/player/ledge-grab.mts';
+import { createLedgePath } from '../src/player/ledge-path.mts';
+import { findLeapLink, resolveLeapRim, resolveLeapTarget } from '../src/player/leap.mts';
 import { createTraversalController } from '../src/player/traversal-controller.mts';
 import { r as publishedPointInPolygon } from '../sumiro/bundle/collision-DtBQEpmQ.js';
 import { n as poolRadius, t as poolCenter } from '../sumiro/bundle/layout-BxJUyHwJ.js';

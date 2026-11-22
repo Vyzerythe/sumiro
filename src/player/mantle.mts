@@ -5,13 +5,59 @@
  * Keep legacy query ranges, offset values and strict thresholds to avoid
  * altering the original ledge traversal behavior in this recovery phase.
  */
-function smoothstep(start, end, x) {
+import type { MovingTriangleBody } from '../physics/moving-body.mts';
+import type { CapsuleHit, CollisionPosition, CollisionSurface, CollisionWorld } from '../physics/world.mts';
+
+type MantleAxes = CollisionPosition & { heading: number };
+type MantleSteering = Readonly<MantleAxes & { stickMag: number; stickX: number; stickZ: number }>;
+
+export interface MantleDestination extends Pick<CollisionPosition, 'x' | 'z'> {
+  height: number;
+  body: MovingTriangleBody | null;
+  heading?: number;
+}
+
+export interface LowMantle {
+  h: number;
+  x0: number;
+  y0: number;
+  z0: number;
+  ax: number;
+  az: number;
+}
+
+export interface LowMantleState extends MantleAxes {
+  mantle: LowMantle | null;
+  carrier: MovingTriangleBody | null;
+  vx: number;
+  vy: number;
+  vz: number;
+  speed: number;
+  grounded: boolean;
+  airDashed: boolean;
+  fade: number;
+  dissolve: number;
+  rootY: number;
+  surface: CollisionSurface;
+  lastGroundY: number;
+}
+
+export interface MantleAnimation {
+  key(): number;
+  finished(): boolean;
+  gait: { idleT: number };
+  playGait(fade: number): void;
+}
+
+function smoothstep(start: number, end: number, x: number) {
   const value = Math.min(Math.max((x - start) / (end - start), 0), 1);
   return value * value * (3 - 2 * value);
 }
 
 /** Look for a low ledge in the direction of manual movement or player facing. */
-export function probeLowMantle(state, world, distance = 1) {
+export function probeLowMantle(
+  state: MantleSteering, world: Pick<CollisionWorld, 'raycast' | 'groundAt'>, distance = 1,
+): MantleDestination | null {
   const usesStick = state.stickMag > .1;
   const dx = usesStick ? state.stickX / state.stickMag : -Math.sin(state.heading);
   const dz = usesStick ? state.stickZ / state.stickMag : -Math.cos(state.heading);
@@ -32,7 +78,10 @@ export function probeLowMantle(state, world, distance = 1) {
 }
 
 /** Search along a collision normal for an accessible mantle landing surface. */
-export function probeWallMantle(state, collision, world, enterMantle) {
+export function probeWallMantle(
+  state: MantleAxes, collision: Pick<CapsuleHit, 'nx' | 'nz'>, world: Pick<CollisionWorld, 'groundAt'>,
+  enterMantle: (destination: MantleDestination) => void,
+) {
   const dx = -collision.nx;
   const dz = -collision.nz;
   for (let step = .05; step <= .8; step += .1) {
@@ -54,7 +103,11 @@ export function probeWallMantle(state, collision, world, enterMantle) {
 }
 
 /** Begin original short mantle animation and reset conflicting motion states. */
-export function beginLowMantle(state, destination, forwardOffset, play, changeState) {
+export function beginLowMantle(
+  state: LowMantleState, destination: MantleDestination, forwardOffset: number,
+  play: (clip: 'mantle_low', options: { fade: number; speed: number }) => void,
+  changeState: (state: 'MANTLE_LOW') => void,
+) {
   if (destination.heading !== undefined) state.heading = destination.heading;
   const dx = -Math.sin(state.heading);
   const dz = -Math.cos(state.heading);
@@ -81,10 +134,12 @@ export function beginLowMantle(state, destination, forwardOffset, play, changeSt
  * The original caller is responsible for responding to a fall transition.
  */
 export function updateLowMantle(
-  state, animation, world, forwardOffset, heightGain,
-  surfaceName, changeState, beginFall,
+  state: LowMantleState, animation: MantleAnimation, world: Pick<CollisionWorld, 'groundAt'>,
+  forwardOffset: number, _heightGain: number,
+  surfaceName: (surface: CollisionSurface) => CollisionSurface,
+  changeState: (state: 'IDLE') => void, beginFall: () => void,
 ) {
-  const mantle = state.mantle;
+  const mantle = state.mantle!;
   const frame = animation.key();
   const along = smoothstep(0, 3, frame);
   state.x = mantle.x0 + (mantle.ax - mantle.x0) * along;

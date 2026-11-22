@@ -7,7 +7,7 @@ import {
   finishLanding, stepAirborne, stepGroundContact, type AirborneState,
   type GroundContactState, type GroundContactEffects, type LandingState,
 } from './motion-physics.mts';
-import { movementConfig as tuning } from './movement-config.mjs';
+import { movementConfig as tuning } from './movement-config.mts';
 
 type TraversalState = GroundContactState & SteeringState & AirborneState & LandingState & JumpState & ClimbingState & {
   jumpClip: 'jump_up' | 'jump_fwd';

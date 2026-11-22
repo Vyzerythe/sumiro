@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
-import { createLedgePath } from '../src/player/ledge-path.mjs';
+import { createLedgePath } from '../src/player/ledge-path.mts';
 import {
   resolveLeapRim, resolveLeapTarget, findLeapLink,
   beginLeap, advanceLeap, abortLeap,
-} from '../src/player/leap.mjs';
+} from '../src/player/leap.mts';
 import { pointInPolygon } from '../src/physics/geometry.mts';
 
 const published=await readFile(new URL('../sumiro/bundle/player-1_KrBWnI.js',import.meta.url),'utf8');
@@ -106,6 +106,16 @@ test('leap initiation, flight interpolation and collision abort match reference'
     [{}, {top:'fall'},[.2,.6]],
   ];
   for (const [state,options,frames] of cases) compareLifecycle(state,options,frames);
+});
+
+test('native routes can omit the takeoff sound hook', () => {
+  const { q, K, k, events, link, target, effects } = createHarness(scenario());
+  delete effects.footstep;
+  beginLeap(q, K, link, target, k, effects);
+  assert.equal(q.state, 'LEAP');
+  assert.deepEqual(events, [
+    ['headingLock'], ['play', 'jump_windup', { fade: 0.05, speed: 2.4 }], ['state', 'LEAP'],
+  ]);
 });
 
 test('explicit interrupted-leap physics and effects match published fall path',()=>{

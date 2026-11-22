@@ -1,9 +1,8 @@
 /**
  * Movement tuning constants recovered from the shipped Sumiro player chunk.
- * These values are intentionally mutable for legacy runtime compatibility;
- * change parameters only with new game-design tests, not as recovery cleanup.
+ * Export a readonly tuning boundary while preserving the legacy runtime object.
  */
-export const movementConfig = {
+const defaults = {
   walk: 1.6, jog: 3.5, run: 6.5, sprint: 8,
   stairsUp: 4.7, stairsDown: 5.4,
   accelStart: 22, accel: 11, accelSprint: 3.5, decel: 28,
@@ -19,3 +18,9 @@ export const movementConfig = {
   inkRecharge: 1.3, inkGuard: .36, assistReach: 1.5,
   stride: {walk: 1.2, jog: 2.6, run: 3, sprint: 3.2, run_stairs: 2},
 };
+
+export type MovementConfig = Readonly<Omit<typeof defaults, 'stride'>> & {
+  readonly stride: Readonly<typeof defaults.stride>;
+};
+
+export const movementConfig: MovementConfig = defaults;

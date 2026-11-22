@@ -17,7 +17,7 @@ Open `http://localhost:8000/sumiro/`. Compare with the unmodified published game
 ## What the script does
 
 1. Validates each chunk it will adapt against a pinned Git blob hash.
-2. Compiles the readable TypeScript and legacy JavaScript modules before replacing the previous development output.
+2. Compiles the strict TypeScript modules before replacing the previous development output.
 3. Copies the published distribution into `.local-build/` and writes the emitted browser modules alongside it.
 4. Rebinds the copied chunks to readable source and writes their provenance to `reconstruction-build.json`.
 
@@ -84,13 +84,13 @@ The copied game delegates transition sequencing to `src/domain/scene-transition.
 
 ### Player cinematic timing
 
-The original player module remains primarily compiled. The isolated development build now imports a source reconstruction of the **scripted player cinematic timeline** from `src/player/cinematic-timeline.mjs`: heading interpolation, animation-frame curves, sequence state labels, and surface classification. Differential tests cover boundary values, extrapolation, and seeded samples against the pinned compiled player bundle.
+The original player module remains primarily compiled. The isolated development build imports a source reconstruction of the **scripted player cinematic timeline** from `src/player/cinematic-timeline.mts`, including heading interpolation, animation-frame curves, sequence state labels, and surface classification. Differential tests cover boundary values, extrapolation, and seeded samples against the pinned compiled player bundle.
 
 This does **not** reconstruct interactive locomotion, climbing, the animation skeleton, or player physics. These are separate, larger integration milestones.
 
 ### Player ledge-path integration
 
-A second player subsystem is now source-backed: `src/player/ledge-path.mjs` reconstructs the X/Z arc-length sampling of ledge points, normalized outward directions, world-space transformations for attached moving bodies, and the published 0.1-unit nearest-grip lookup. Its differential test covers moving platforms, duplicate points, edge samples, and range restrictions. It does **not** replace the full climbing state machine, physics integration, or animation/IK solver.
+`src/player/ledge-path.mts` reconstructs the X/Z arc-length sampling of ledge points, normalized outward directions, world-space transformations for attached moving bodies, and the published 0.1-unit nearest-grip lookup. Its differential test covers moving platforms, duplicate points, edge samples, and range restrictions.
 
 ### Interactive player steering
 
@@ -106,21 +106,21 @@ The source-backed development player calls `src/player/locomotion.mts` for groun
 
 ### Recovery: player movement tuning and jump browser regression
 
-`src/player/movement-config.mjs` now holds the published movement speed, acceleration, gravity, jump, dash and capsule parameters and is imported by the **copied** player bundle. Its complete object structure and insertion order are checked against the immutable compiled reference in `tests/player-movement-config-parity.test.mjs`.
+`src/player/movement-config.mts` holds the published movement speed, acceleration, gravity, jump, dash, and capsule parameters. `tests/player-movement-config-parity.test.mjs` checks its structure and insertion order against the immutable compiled reference.
 
 The required sandbox Chromium regression now runs `node scripts/browser-smoke.mjs --play --jump`. After the already verified W-key movement, it presses Space and records frame-sampled player debug states, requiring an upward `JUMP` and subsequent grounded `PLAY` state in **both** published and source-backed builds, without imposing frame-count or speed equality on headless software rendering. This extends coverage to a bounded real movement and landing scenario; climbing/combat/save progression are still not certified.
 
 ### Ledge grab, hang, shimmy and climb controller
 
-The development build now replaces the original bundled `St`/`Ct`/`wt` ledge-grab and `kt`/`At`/`jt` hanging-climb code with delegation into `src/player/ledge-grab.mjs` and `src/player/ledge-controller.mjs`. The original callback environment (animation, state transitions, level-world lookups, camera rail and leap/drop helpers) remains wired from the player runtime. Differential tests `tests/player-ledge-grab-parity.test.mjs` and `tests/player-ledge-controller-parity.test.mjs` verify detection order, body enablement, movement-state initialization, input priorities, shimmy direction, and climb completion. Mantle animation and generic leap selection remain compiled pending separate tested integration.
+The development build replaces the bundled `St`/`Ct`/`wt` ledge-grab and `kt`/`At`/`jt` hanging-climb code with calls to `src/player/ledge-grab.mts` and `src/player/ledge-controller.mts`. The player runtime supplies callbacks for animation, state transitions, collision, camera rail, and leap or drop. Differential tests verify detection order, body enablement, movement-state initialization, input priorities, shimmy direction, and climb completion.
 
 ### Source-backed low-mantle subsystem
 
-The copied player runtime now delegates low-ledge probing, collision-normal mantle detection, mantle initiation, and clip-driven mantle completion to `src/player/mantle.mjs`. The original callbacks for animation, world queries, state changes, and falling are retained. Differential tests check query bounds, ground obstruction, carrier handling, animation progress, and the fallback when no landing surface is found. This complements the recovered ledge grab, hang, shimmy, and full climb transition, but does not yet recover the complete motion solver, player skeletal animation, scene routing, or combat.
+The copied player runtime delegates low-ledge probing, collision-normal mantle detection, mantle initiation, and clip-driven mantle completion to `src/player/mantle.mts`. Differential tests check query bounds, ground obstruction, carrier handling, animation progress, and the fallback when no landing surface is found.
 
 ### Leap routing and flight controller
 
-The original player module's contiguous leap subsystem (target selection, rim index resolution, jump-link search, leap setup, in-flight trajectory, collision interruption, and landing) is now bridged into `src/player/leap.mjs`. The copied player retains only thin compatibility wrappers and passes its existing animation, collision, landing, GRAB and state-change callbacks to the source module. `tests/player-leap-parity.test.mjs` compares the recovered behavior with the original player function bodies for authored targets, flight progress, aborts, and landing transitions. Browser sandbox play is the next integration gate; the existing smoke test exercises walking and ordinary jumping, not authored gap leaps.
+The original player module's leap subsystem delegates to `src/player/leap.mts` for target selection, rim indexing, launch, flight, and collision interruption. `tests/player-leap-parity.test.mjs` compares these behaviors against the original functions. The native runtime uses the same kernels for the Chapter One gap.
 
 ### Integrated player ground, air and landing physics
 

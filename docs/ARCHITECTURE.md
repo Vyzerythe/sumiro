@@ -26,11 +26,11 @@ The `assets/` hierarchy groups media by purpose (for example `audio/`, `backdrop
 | --- | --- |
 | `sumiro/` | Published reference and deployed entry point |
 | `.local-build/` | Transitional gameplay build. Pinned adapters load readable domain, collision, player and frame-sizing code into the published runtime. |
-| `src/rendering/` | Native Three.js r187 device lifecycle, TSL surface data, edge analysis, composite and grade. The opt-in Dawn harness reads back GPU pixels. |
+| `src/rendering/` | Native Three.js r187 device lifecycle, TSL surface materials, edge analysis, paper, fog and grade. The opt-in Dawn harness reads back GPU pixels. |
 | `src/runtime/source-runtime.mts` | Composes native rendering, system hosting, assets, audio, timing, and teardown. |
-| `.local-build-source/` | Local native application preview. Loads Chapter One geometry and supports grounded traversal of the chapter's decoded terrain with `?walk=1`. |
+| `.local-build-source/` | Local native application preview. Loads all six authored static worlds. `?walk=1` enables native traversal, player animation, and recovered mechanisms and interactions. |
 
-The target is a source-only TypeScript application that uses the native WebGPU renderer for gameplay. The preview proves the source composition can load and draw repository geometry on WebGPU. Scene assembly, gameplay, materials, remaining render effects, and end-to-end gameplay verification are still in progress.
+The target is the complete source-only TypeScript game on WebGPU. The current native preview exercises all six scene activations, Chapter One traversal and interactions, and Chapter Two's gate and moving platforms. Later chapter-specific traversal, encounters, presentation, and end-to-end gameplay verification remain in progress.
 
 ## Stability boundaries
 

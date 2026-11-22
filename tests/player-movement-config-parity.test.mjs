@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
-import { movementConfig } from '../src/player/movement-config.mjs';
+import { movementConfig } from '../src/player/movement-config.mts';
 
 const source = await readFile(new URL('../sumiro/bundle/player-1_KrBWnI.js',import.meta.url),'utf8');
 const catalog = source.match(/var O=(\{[\s\S]*?\}),k=O,ee=24/);

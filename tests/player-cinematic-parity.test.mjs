@@ -6,7 +6,7 @@ import {
   headingKeys, runFrameKeys, jogFrameKeys,
   interpolateHeading, runAnimationFrame, jogAnimationFrame,
   timelineState, timelineSurface,
-} from '../src/player/cinematic-timeline.mjs';
+} from '../src/player/cinematic-timeline.mts';
 
 const bundle = await readFile(
   new URL('../sumiro/bundle/player-1_KrBWnI.js', import.meta.url), 'utf8',

@@ -12,7 +12,7 @@ export const bundleAdapters = {
   },
   kit: {
     file: 'bundle/kit-B01EgPBo.js', gitBlob: 'd92a7b85baceb33cf9c7243a27fbfea98fa5436d',
-    status: 'hybrid', sourceModules: ['src/domain/scrolls.mjs'],
+    status: 'hybrid', sourceModules: ['src/domain/scrolls.mts'],
   },
   collision: {
     file: 'bundle/collision-DtBQEpmQ.js', gitBlob: 'bb06154a9be5a24421a017f4c84adf7c87064d1b',
@@ -23,16 +23,16 @@ export const bundleAdapters = {
     file: 'bundle/player-1_KrBWnI.js', gitBlob: '2ba1dbb18011510e025d5f3af06b045f143a3d10',
     status: 'hybrid',
     sourceModules: [
-      'src/player/cinematic-timeline.mjs',
+      'src/player/cinematic-timeline.mts',
       'src/player/input-steering.mts',
-      'src/player/leap.mjs',
-      'src/player/ledge-controller.mjs',
-      'src/player/ledge-grab.mjs',
-      'src/player/ledge-path.mjs',
+      'src/player/leap.mts',
+      'src/player/ledge-controller.mts',
+      'src/player/ledge-grab.mts',
+      'src/player/ledge-path.mts',
       'src/player/locomotion.mts',
-      'src/player/mantle.mjs',
+      'src/player/mantle.mts',
       'src/player/motion-physics.mts',
-      'src/player/movement-config.mjs',
+      'src/player/movement-config.mts',
     ],
   },
   hud: {

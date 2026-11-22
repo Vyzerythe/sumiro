@@ -6,7 +6,7 @@ import ts from 'typescript';
 import { AnimationClip, AnimationMixer, Group, Mesh, Object3D, NumberKeyframeTrack, SkinnedMesh, Texture, TextureLoader } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createAnimatedPlayer, loadAnimatedPlayer } from '../src/player/animated-player.mts';
-import { movementConfig } from '../src/player/movement-config.mjs';
+import { movementConfig } from '../src/player/movement-config.mts';
 import { t as createPublishedAnimator } from '../sumiro/bundle/anim-DUsNrsnS.js';
 
 const clipDurations = {

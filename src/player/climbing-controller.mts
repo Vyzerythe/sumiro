@@ -1,69 +1,31 @@
 import type { InputManager } from '../input/input-manager.mts';
 import type { MovingTriangleBody } from '../physics/moving-body.mts';
-import type { CollisionPosition, CollisionSurface, CollisionWorld } from '../physics/world.mts';
-import { completeLedgeClimb, shimmyAlongLedge, updateLedgeHang } from './ledge-controller.mjs';
-import { alignToLedge, beginLedgeGrab, detectLedgeGrab } from './ledge-grab.mjs';
-import { createLedgePath } from './ledge-path.mjs';
-import { abortLeap, advanceLeap, beginLeap, findLeapLink, resolveLeapTarget } from './leap.mjs';
+import type { CollisionSurface, CollisionWorld } from '../physics/world.mts';
+import { completeLedgeClimb, shimmyAlongLedge, updateLedgeHang } from './ledge-controller.mts';
+import { alignToLedge, beginLedgeGrab, detectLedgeGrab, type LedgeGrabState, type LedgeGrabView } from './ledge-grab.mts';
+import { createLedgePath, type LedgePath, type LedgePoint } from './ledge-path.mts';
+import {
+  abortLeap, advanceLeap, beginLeap, findLeapLink, resolveLeapTarget,
+  type LeapDefinition, type LeapLaunch, type LeapState, type LeapTarget, type LeapView,
+} from './leap.mts';
 import { selectTravelDirection } from './locomotion.mts';
-import { movementConfig } from './movement-config.mjs';
+import { movementConfig } from './movement-config.mts';
 
 export interface TraversalLedgeDefinition {
   id: string;
-  points: readonly (readonly [number, number, number, number, number])[];
+  points: readonly LedgePoint[];
   climbable: boolean | readonly (readonly [number, number])[];
   body?: MovingTriangleBody | null;
 }
 
-export interface TraversalLedge extends TraversalLedgeDefinition {
-  length: number;
-  s: number[];
-  at(distance: number, sample?: LedgeSample): LedgeSample;
-  nearest(x: number, z: number, minimum?: number, maximum?: number): number;
-}
+export type TraversalLedge = TraversalLedgeDefinition & LedgePath;
 
-interface LedgeSample extends CollisionPosition {
-  ox: number;
-  oz: number;
-  s: number;
-}
+export type TraversalLeapDefinition = LeapDefinition;
 
-export interface TraversalLeapDefinition {
-  id: string;
-  from?: { poly: readonly (readonly [number, number])[]; yMin?: number; yMax?: number };
-  fromLedge?: string;
-  to: { ledge: string; sFrom: number; sTo: number } | { land: readonly [number, number]; spread: number };
-  minSpeed?: number;
-  maxAngle?: number;
-  time: number;
-  clip: string;
-  camera?: { toF: number } | { toLanding: boolean };
-}
-
-interface LeapTarget extends CollisionPosition { ledge: TraversalLedge | null; s?: number }
-type LeapLink = Pick<TraversalLeapDefinition, 'time' | 'clip' | 'camera'> & { exactTime?: number };
-
-export interface ClimbingState extends CollisionPosition {
-  state: string;
-  stateT: number;
-  heading: number;
-  rootY: number;
-  lastGroundY: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  grounded: boolean;
+export interface ClimbingState extends LeapState<TraversalLedge>, LedgeGrabState<MovingTriangleBody, TraversalLedge> {
   noGrab: number;
-  coyote: number;
   jumpBuf: number;
-  carrier: MovingTriangleBody | null;
   surface: CollisionSurface;
-  ledge: TraversalLedge | null;
-  ledgeS: number;
-  shimmyHold: { key: number; dir: number } | null;
-  hangForward: number;
-  hangBack: number;
-  hangBackFresh: boolean;
   stickMag: number;
   stickX: number;
   stickZ: number;
@@ -73,7 +35,6 @@ export interface ClimbingState extends CollisionPosition {
   holdAngle: number;
   yaw: number;
   stickAngle: number;
-  leap: { t: LeapTarget; time: number; link: LeapLink } | null;
   gestureClip: string | null;
   gestureSpeed: number;
 }
@@ -99,13 +60,13 @@ export function createClimbingController(
   const byId = new Map(ledges.map(ledge => [ledge.id, ledge]));
   for (const { to, id } of leapLinks) if ('ledge' in to && !byId.has(to.ledge)) throw Error(`Unresolved ledge in ${id}`);
   const sample = { x: 0, y: 0, z: 0, ox: 0, oz: 0, s: 0 };
-  const presentation = { kind: null, p: 0, holdYaw: 0, ledge: null };
+  const presentation: LedgeGrabView<TraversalLedge> & LeapView = { kind: null, p: 0, holdYaw: 0, ledge: null };
   const direction = { x: 0, z: 0 };
   const capsule = { radius: 0.2, height: 1.5, guards: false, solid: true };
   const collision = world.sweepCapsule(state, 0, 0, capsule);
   let clipStartedAt = 0;
 
-  function play(clip: string, options?: { speed?: number }) {
+  function play(clip: string, options?: { fade?: number; speed?: number }) {
     state.gestureClip = clip;
     state.gestureSpeed = options?.speed ?? 1;
     clipStartedAt = state.stateT;
@@ -135,10 +96,8 @@ export function createClimbingController(
     },
   };
 
-  function launch(link: LeapLink, target: LeapTarget) {
-    beginLeap(state, presentation, link, target, movementConfig, {
-      ...effects, footstep: () => {},
-    });
+  function launch(link: LeapLaunch, target: LeapTarget<TraversalLedge>) {
+    beginLeap(state, presentation, link, target, movementConfig, effects);
     state.ledge = null;
     state.jumpBuf = 0;
     clipStartedAt = 0;
@@ -149,7 +108,7 @@ export function createClimbingController(
     const start = state.ledge.at(state.ledgeS);
     const angle = railYaw * Math.PI / 180;
     let best = 0.3;
-    let target: LeapTarget | undefined;
+    let target: LeapTarget<TraversalLedge> | undefined;
     for (const ledge of ledges) {
       if (ledge === state.ledge || ledge.body?.enabled === false) continue;
       const s = ledge.nearest(start.x, start.z);
