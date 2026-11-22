@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict';
 import { create, globals } from 'webgpu';
 import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
-import { uniform, vec3, vec4 } from 'three/tsl';
+import { uniform, vec3 } from 'three/tsl';
+import { createInkGrade } from '../../src/rendering/ink-grade.mts';
 import { createWebGpuSurface } from '../../src/rendering/webgpu-renderer.mts';
 
 const gpu = create(process.argv.slice(2));
-Object.assign(globalThis, globals, { self: globalThis, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
+let pendingFrame;
+Object.assign(globalThis, globals, {
+  self: globalThis,
+  requestAnimationFrame(callback) {
+    pendingFrame = callback;
+    return 1;
+  },
+  cancelAnimationFrame() {
+    pendingFrame = undefined;
+  },
+});
 Object.defineProperty(navigator, 'gpu', { value: gpu, configurable: true });
 const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
 assert.ok(adapter, 'Dawn must expose a WebGPU adapter');
@@ -51,11 +62,11 @@ camera.position.z = 2;
 const scene = new Scene();
 const geometry = new PlaneGeometry(2, 2);
 const material = new MeshBasicNodeMaterial();
-material.colorNode = vec3(0.25, 0.5, 0.75);
+const strength = uniform(1);
+material.colorNode = vec3(0.25, 0.5, 1.5).mul(strength);
 scene.add(new Mesh(geometry, material));
-const strength = uniform(0.5);
 
-async function sample() {
+async function sample(x, y) {
   const { format } = configuration;
   assert.match(format, /^(rgba|bgra)8unorm(?:-srgb)?$/, 'readback requires a four-byte normalized format');
   const bytesPerRow = 256;
@@ -63,7 +74,7 @@ async function sample() {
   try {
     const encoder = device.createCommandEncoder();
     encoder.copyTextureToBuffer(
-      { texture: attachment, origin: { x: Math.floor(canvas.width / 2), y: Math.floor(canvas.height / 2) } },
+      { texture: attachment, origin: { x, y } },
       { buffer: readback, bytesPerRow },
       { width: 1, height: 1 },
     );
@@ -81,10 +92,7 @@ let surface;
 try {
   surface = await createWebGpuSurface({
     canvas, scene, camera,
-    buildOutput(scenePass) {
-      const color = scenePass.getTextureNode();
-      return vec4(color.rgb.mul(strength), color.a);
-    },
+    buildOutput: scenePass => createInkGrade(scenePass.getTextureNode()),
   }, {
     requestAdapter: async () => ({
       async requestDevice(descriptor) {
@@ -96,22 +104,31 @@ try {
   assert.equal(surface.backend, 'webgpu');
   device.pushErrorScope('validation');
   surface.render();
-  const first = await sample();
+  const first = { center: await sample(16, 16), corner: await sample(1, 1) };
   surface.resize(64, 48, 1.25);
   surface.setResolutionScale(0.75);
   strength.value = 0.25;
+  assert.equal(typeof pendingFrame, 'function', 'Three.js must schedule a new render frame');
+  pendingFrame(performance.now());
   surface.render();
-  const resized = await sample();
+  const resized = { center: await sample(40, 30), corner: await sample(1, 1) };
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
   assert.deepEqual([canvas.width, canvas.height], [80, 60]);
 
-  // Expected standard sRGB encoding of the linear scene color at each strength.
-  const expected = [[99, 137, 165, 255], [71, 99, 120, 255]];
+  // Independent CPU evaluation of the shoulder and corner curves, then sRGB.
+  // A two-code-value band accommodates the bounded per-pixel dither and f16 sampling.
+  const expected = [
+    { center: [137, 188, 237, 255], corner: [115, 152, 186, 255] },
+    { center: [71, 99, 165, 255], corner: [56, 76, 121, 255] },
+  ];
   const tolerance = 2;
-  for (const [index, pixel] of [first, resized].entries()) {
-    assert.ok(pixel.every((value, channel) => Math.abs(value - expected[index][channel]) <= tolerance),
-      `frame ${index + 1}: expected ${expected[index]} ± ${tolerance}, got ${pixel}`);
+  for (const [index, frame] of [first, resized].entries()) {
+    for (const [position, pixel] of Object.entries(frame)) {
+      const target = expected[index][position];
+      assert.ok(pixel.every((value, channel) => Math.abs(value - target[channel]) <= tolerance),
+        `frame ${index + 1} ${position}: expected ${target} ± ${tolerance}, got ${pixel}`);
+    }
   }
   console.log('Native WebGPU readback', JSON.stringify({ first, resized, expected, tolerance }));
 } finally {

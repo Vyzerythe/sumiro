@@ -4,10 +4,10 @@ import {
   Mesh, NodeMaterial, PerspectiveCamera, PlaneGeometry, REVISION, Scene, WebGPURenderer, WGSLNodeBuilder,
 } from 'three/webgpu';
 import { uniform, vec4 } from 'three/tsl';
+import { createInkGrade } from '../src/rendering/ink-grade.mts';
 import { createWebGpuPipeline, createWebGpuSurface } from '../src/rendering/webgpu-renderer.mts';
 
-test('the native pipeline composes a sampled scene pass into WGSL on Three.js r187', () => {
-  assert.equal(REVISION, '187');
+function compileSceneOutput(buildOutput) {
   const renderer = new WebGPURenderer({ canvas: { width: 32, height: 32 } });
   // The shader compiler expects these capabilities from an initialized renderer.
   // Use the baseline feature set and local bind groups without submitting commands.
@@ -17,25 +17,37 @@ test('the native pipeline composes a sampled scene pass into WGSL on Three.js r1
   const camera = new PerspectiveCamera();
   const material = new NodeMaterial();
   const geometry = new PlaneGeometry();
-  const effectStrength = uniform(0.5).setName('effectStrength');
-  const pipeline = createWebGpuPipeline(renderer, scene, camera, scenePass => {
-    const color = scenePass.getTextureNode();
-    return vec4(color.rgb.mul(effectStrength), color.a);
-  });
+  const pipeline = createWebGpuPipeline(renderer, scene, camera, buildOutput);
   try {
     material.fragmentNode = pipeline.outputNode;
     const builder = new WGSLNodeBuilder(new Mesh(geometry, material), renderer);
     builder.scene = scene;
     builder.camera = camera;
     builder.build();
-    assert.match(builder.fragmentShader, /textureSample/);
-    assert.match(builder.fragmentShader, /effectStrength/);
-    assert.match(builder.fragmentShader, /@fragment/);
+    return builder.fragmentShader;
   } finally {
     pipeline.dispose();
     material.dispose();
     geometry.dispose();
   }
+}
+
+test('the native pipeline composes a sampled scene pass into WGSL on Three.js r187', () => {
+  assert.equal(REVISION, '187');
+  const effectStrength = uniform(0.5).setName('effectStrength');
+  const shader = compileSceneOutput(scenePass => {
+    const color = scenePass.getTextureNode();
+    return vec4(color.rgb.mul(effectStrength), color.a);
+  });
+  assert.match(shader, /textureSample/);
+  assert.match(shader, /effectStrength/);
+  assert.match(shader, /@fragment/);
+});
+
+test('ink grade emits five sampling taps and derives their spacing from the scene texture', () => {
+  const shader = compileSceneOutput(scenePass => createInkGrade(scenePass.getTextureNode()));
+  assert.equal([...shader.matchAll(/\btextureSample\s*\(/g)].length, 5);
+  assert.match(shader, /textureDimensions\s*\(/);
 });
 
 test('the render pipeline releases a real pass target after setup failure and on disposal', () => {
