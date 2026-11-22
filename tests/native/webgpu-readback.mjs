@@ -77,6 +77,15 @@ const foregroundMaterial = new MeshBasicNodeMaterial();
 foregroundMaterial.mrtNode = createInkSurfaceOutput({ lineWeight: 1, movingSurfaceId: 3 });
 const foreground = new Mesh(foregroundGeometry, foregroundMaterial);
 foreground.position.set(0.2, 0, 1);
+const keyboardTarget = new EventTarget();
+
+function pressSpace() {
+  const event = Object.assign(new Event('keydown', { cancelable: true }), {
+    code: 'Space', repeat: false, ctrlKey: false, altKey: false,
+  });
+  keyboardTarget.dispatchEvent(event);
+  return event.defaultPrevented;
+}
 
 async function sample(x, y) {
   const { format } = configuration;
@@ -134,13 +143,14 @@ try {
         },
         update(delta, context) {
           updateCallbacks++;
-          context.registry.set('fixture.step', [context.time.step, delta]);
+          context.registry.set('fixture.step', [context.time.step, delta, context.input.jump]);
         },
         beforeRender() { renderCallbacks++; },
       }),
     },
     viewport: { width: 32, height: 32, pixelRatio: 1 },
     assets: { assetBaseURL: 'https://reference.invalid/' },
+    input: { keyboardTarget },
     gpu: {
       requestAdapter: async () => ({
         async requestDevice(descriptor) {
@@ -154,13 +164,17 @@ try {
   assert.equal(runtime.context.assets.pending, 0);
   assert.equal(runtime.report()[0].failed, null);
   assert.ok(scene.children.includes(background));
+  assert.deepEqual(runtime.context.registry.get('fixture.step'), [0, 0, false]);
+  assert.equal(pressSpace(), true);
   runtime.step();
-  assert.deepEqual(runtime.context.registry.get('fixture.step'), [1, 1 / 60]);
+  assert.deepEqual(runtime.context.registry.get('fixture.step'), [1, 1 / 60, true]);
+  assert.equal(runtime.context.input.jump, false);
   assert.equal(runtime.context.clock.elapsedTime, 1 / 60);
   runtime.context.paused = true;
   runtime.step();
   assert.equal(runtime.context.time.step, 1);
-  assert.equal(updateCallbacks, 2);
+  assert.equal(updateCallbacks, 3);
+  assert.deepEqual(runtime.context.registry.get('fixture.step'), [1, 1 / 60, false]);
   runtime.context.paused = false;
   device.pushErrorScope('validation');
   runtime.render();
@@ -241,6 +255,7 @@ try {
     await disposing;
     assert.equal(systemCleanups, 1);
     assert.equal(scene.children.includes(background), false);
+    assert.equal(pressSpace(), false);
     await assert.rejects(runtime.context.assets.loadJSON('data:application/json,null'), { name: 'AbortError' });
     assert.ok(unconfigured > 0);
     assert.throws(() => runtime.render(), /disposed/);

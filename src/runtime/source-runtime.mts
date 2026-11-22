@@ -1,5 +1,6 @@
 import { PerspectiveCamera, type Camera, type Object3D, type Scene } from 'three/webgpu';
 import { createAssetManager, type AssetManager, type AssetManagerOptions } from '../assets/asset-manager.mts';
+import { createInputManager, type InputManager, type InputManagerOptions } from '../input/input-manager.mts';
 import { createWebGpuSurface } from '../rendering/webgpu-renderer.mts';
 import { FixedStepClock, SimulationTimeReader } from './fixed-step-clock.mts';
 import { startLiveLoop } from './live-loop.mts';
@@ -16,6 +17,7 @@ export interface SourceRuntimeContext {
   readonly scene: Scene;
   readonly camera: Camera;
   readonly assets: AssetManager;
+  readonly input: InputManager;
   readonly registry: RuntimeRegistry;
   readonly time: FixedStepClock;
   readonly clock: SimulationTimeReader;
@@ -30,6 +32,7 @@ type Surface = Awaited<ReturnType<typeof createWebGpuSurface>>;
 interface SourceRuntimeOptions {
   graphics: Parameters<typeof createWebGpuSurface>[0];
   assets: AssetManagerOptions;
+  input?: InputManagerOptions;
   systems: Record<string, SourceSystemLoader>;
   viewport: Viewport;
   only?: readonly string[];
@@ -44,16 +47,17 @@ interface SourceRuntimeOptions {
 
 /** Owns subsystem lifetime, asset loading, and native rendering for one source session. */
 export async function createSourceRuntime({
-  graphics, assets: assetOptions, systems, viewport, only,
+  graphics, assets: assetOptions, input: inputOptions, systems, viewport, only,
   simulationHz = 60, videoFps = 24, referenceHeight = 704, initializeTimeoutMs = 120_000,
   canSubmitFrame = () => true, gpu, frames,
 }: SourceRuntimeOptions) {
   if (!Number.isFinite(referenceHeight) || referenceHeight <= 0) throw RangeError('Reference height must be positive');
   const time = new FixedStepClock(simulationHz, videoFps);
   const assets = createAssetManager(assetOptions);
+  const input = createInputManager(inputOptions);
   const view = { ...viewport, drawWidth: 0, drawHeight: 0, pxScale: 1 };
   const context: SourceRuntimeContext = {
-    scene: graphics.scene, camera: graphics.camera, assets,
+    scene: graphics.scene, camera: graphics.camera, assets, input,
     registry: new RuntimeRegistry(), time, clock: new SimulationTimeReader(time),
     view, paused: false,
   };
@@ -73,9 +77,13 @@ export async function createSourceRuntime({
       host?.dispose();
     } finally {
       try {
-        assets.dispose();
+        input.dispose();
       } finally {
-        await surface?.dispose();
+        try {
+          assets.dispose();
+        } finally {
+          await surface?.dispose();
+        }
       }
     }
   }
@@ -97,6 +105,15 @@ export async function createSourceRuntime({
     }
   }
 
+  function updateSystems(target: NonNullable<typeof host>, elapsed: number, paused: boolean) {
+    try {
+      input.beginStep(time.t, elapsed);
+      target.update(elapsed, paused);
+    } finally {
+      input.endStep();
+    }
+  }
+
   try {
     host = createSystemHost<Object3D, SourceRuntimeContext>(context, {
       defaultBudgetMs: 1.5,
@@ -106,6 +123,8 @@ export async function createSourceRuntime({
     applyViewport(surface, viewport.width, viewport.height, viewport.pixelRatio);
     await host.load(systems, only);
     await assets.whenIdle();
+    updateSystems(host, 0, context.paused);
+    time.dt = time.fixedDt;
   } catch (error) {
     try {
       await dispose();
@@ -125,7 +144,7 @@ export async function createSourceRuntime({
     assertActive();
     const paused = context.paused;
     if (!paused) time.advance();
-    activeHost.update(time.fixedDt, paused);
+    updateSystems(activeHost, time.fixedDt, paused);
   }
 
   function render(alpha = 1) {

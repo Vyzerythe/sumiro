@@ -238,6 +238,10 @@ entryRewritten = entryRewritten.slice(0, optionsBegin)
   + 'const launchOptions=parseLaunchOptions(window.location.search),tg=launchOptions.options;'
   + 'function ng(){for(const diagnostic of launchOptions.diagnostics)console.error("[engine] "+diagnostic)}'
   + entryRewritten.slice(optionsEnd);
+const inputBegin = entryRewritten.indexOf(',Vg=.15,Hg=');
+const inputEnd = entryRewritten.indexOf(';function Jg(e,t=!1)', inputBegin);
+if (inputBegin < 0 || inputEnd <= inputBegin) throw Error('Published input manager boundary changed: re-audit');
+entryRewritten = entryRewritten.slice(0, inputBegin) + entryRewritten.slice(inputEnd);
 const loopBegin = entryRewritten.indexOf('runLive(){let{ctx:e}=this');
 const loopEnd = entryRewritten.indexOf('}_perfWarn(', loopBegin);
 if (loopBegin < 0 || loopEnd <= loopBegin) throw Error('Published live frame loop boundary changed: re-audit');
@@ -259,6 +263,16 @@ for (const [boundary, replacement] of [
   ['this.pausedFrame=!1,this.fences=[]', 'this.fences=[]'],
   ['wv(t),r.pausedFrame=!1', 'wv(t),r.liveLoop?.invalidate()'],
   ['()=>{n.dispose(),t.input.dispose(),t.assets.dispose()}', '()=>{r.liveLoop?.stop();n.dispose();t.input.dispose();t.assets.dispose()}'],
+  ['new qg({scripted:tg.capture||tg.autorun})', 'createInputManager({keyboardTarget:window,pointerTarget:window,'
+    + 'blurTarget:window,getGamepads:()=>{try{return navigator.getGamepads?.()}catch{return[]}},'
+    + '...((tg.capture||tg.autorun)?{scriptedRoute:Bg}:{})})'],
+  ['e._beginStep(0),this.host.update(0),e._endStep(),this._syncBeat(),t.dt=t.fixedDt',
+    'e.beginStep(0);try{this.host.update(0)}finally{e.endStep()}this._syncBeat();t.dt=t.fixedDt'],
+  ['n._beginStep(t.t,t.fixedDt),this.host.update(t.fixedDt,!0),n._endStep();return',
+    'n.beginStep(t.t,t.fixedDt);try{this.host.update(t.fixedDt,!0)}finally{n.endStep()}return'],
+  ['n._beginStep(t.t,t.fixedDt);let r=og.now();this.host.update(t.fixedDt),this.lastStepMs=og.now()-r,n._endStep(),this._syncBeat()',
+    'n.beginStep(t.t,t.fixedDt);const start=og.now();'
+    + 'try{this.host.update(t.fixedDt);this.lastStepMs=og.now()-start}finally{n.endStep()}this._syncBeat()'],
 ]) {
   if (entryRewritten.split(boundary).length !== 2) throw Error('Published entry boundary changed: ' + boundary);
   entryRewritten = entryRewritten.replace(boundary, replacement);
@@ -268,6 +282,7 @@ entryRewritten = "import { createSystemHost } from '../../src/runtime/system-hos
   + "import { RuntimeRegistry } from '../../src/runtime/registry.mjs';\n"
   + "import { startLiveLoop } from '../../src/runtime/live-loop.mjs';\n"
   + "import { parseLaunchOptions } from '../../src/runtime/launch-options.mjs';\n"
+  + "import { createInputManager } from '../../src/input/input-manager.mjs';\n"
   + entryRewritten;
 const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 
@@ -306,6 +321,7 @@ const report = {
     'src/domain/save.mts',
     'src/domain/chapters.mts',
     'src/domain/scrolls.mjs',
+    'src/input/input-manager.mts',
     'src/physics/geometry.mts',
     'src/physics/moving-body.mts',
     'src/physics/world.mjs',

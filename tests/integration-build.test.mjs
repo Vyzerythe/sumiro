@@ -163,6 +163,14 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputEntry, /r\.liveLoop\?\.invalidate\(\)/);
     assert.match(outputEntry, /r\.liveLoop\?\.stop\(\);n\.dispose\(\)/);
     assert.match(outputEntry, /launchOptions=parseLaunchOptions\(window\.location\.search\),tg=launchOptions\.options/);
+    assert.match(outputEntry, /input:createInputManager\(\{keyboardTarget:window/);
+    assert.doesNotMatch(outputEntry, /new qg\(\{scripted:tg\.capture/);
+    const { createInputManager } = await import(pathToFileURL(join(out, 'src/input/input-manager.mjs')).href);
+    const input = createInputManager();
+    input.beginStep(0);
+    assert.equal(input.forward, 0);
+    input.endStep();
+    input.dispose();
     const { parseLaunchOptions } = await import(pathToFileURL(join(out, 'src/runtime/launch-options.mjs')).href);
     const launch = parseLaunchOptions('?play=1&size=1280x720');
     assert.deepEqual(launch.options.size, { width: 1280, height: 720 });

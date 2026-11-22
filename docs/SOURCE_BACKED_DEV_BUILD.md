@@ -145,3 +145,7 @@ The live frame loop uses a renderer-independent scheduler. It carries fractional
 ### Launch configuration and persistence
 
 The typed launch parser preserves the original query modes and raw parameters. It rejects incomplete camera coordinates and zero or unsafe viewport dimensions. Save and chapter data use typed interfaces while preserving the shipped storage keys, load priority, transition identity, and permissive legacy fields. Storage access errors return the same failure values as the bundled game.
+
+### Input sampling
+
+Both runtime paths use `src/input/input-manager.mts` for keyboard, pointer, gamepad, and scripted-route input. A system update sees one consistent set of presses and deltas. Input arriving during an update waits for the next tick. Blur clears held and queued state, and teardown removes the registered listeners.
