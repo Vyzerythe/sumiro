@@ -133,3 +133,7 @@ The copied renderer delegates scale limits, pixel-budget clamping, full-resoluti
 ### Mesh visibility and geometry
 
 The copied sight chunk loads `src/physics/sight.mts`, covering mesh extraction, triangle raycasts, line-of-sight checks, edge filtering, and in-place long-edge relaxation. Differential tests run the five source exports against the original chunk with indexed, mirrored, interleaved, and normalized meshes.
+
+### System lifecycle
+
+The copied entry delegates subsystem loading, updates, render callbacks, and chapter membership to `src/runtime/system-host.mts`. It preserves ordinary routing and tracks cleanup callbacks, abort signals, and scene roots. A failed system releases its resources while independent systems continue. Legacy modules can register roots implicitly during initialization. New systems can register resources explicitly through their lifetime to receive cleanup even after cancellation.

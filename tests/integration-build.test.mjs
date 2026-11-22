@@ -16,10 +16,11 @@ const player = 'sumiro/bundle/player-1_KrBWnI.js';
 const trail = 'sumiro/bundle/trail-BFIL-IHB.js';
 const renderer = 'sumiro/bundle/render_pipeline-BTCk4Dyc.js';
 const sight = 'sumiro/bundle/sight-DXR0ElmN.js';
+const entry = 'sumiro/bundle/index-DnHRwVtn.js';
 
 test('source-backed build preserves originals and binds live domain imports', async () => {
   const hash = data => createHash('sha256').update(data).digest('hex');
-  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer, sight];
+  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer, sight, entry];
   const before = await Promise.all(publishedChunks.map(p => readFile(join(root,p))));
   try {
     const result = spawnSync(process.execPath, ['scripts/build-reconstructed-dev.mjs', '--out', out], {
@@ -150,8 +151,21 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputRenderer, /setSize\(view\)\{this\.ss=this\._ssFor\(view\);const \{[^}]+\}=measureRenderTargets\(/);
     const resolution = await import(pathToFileURL(join(out, 'src/rendering/frame-resolution.mjs')).href);
     assert.equal(resolution.capRenderScale(2880, 2, 2160), 1);
-    const syntax = spawnSync(process.execPath, ['--check', join(out, renderer)], { encoding: 'utf8' });
-    assert.equal(syntax.status, 0, syntax.stderr);
+    const outputEntry = await readFile(join(out, entry), 'utf8');
+    assert.match(outputEntry, /import \{ createSystemHost \} from '\.\.\/\.\.\/src\/runtime\/system-host\.mjs'/);
+    assert.match(outputEntry, /createSystemHost\(t,\{defaultBudgetMs:fg\.systemMs/);
+    assert.doesNotMatch(outputEntry, /new hv\(t\)/);
+    const { createSystemHost } = await import(pathToFileURL(join(out, 'src/runtime/system-host.mjs')).href);
+    const host = createSystemHost({ scene: { children: [] } }, { defaultBudgetMs: 1, initializeTimeoutMs: 1000 });
+    let updated = false;
+    await host.load({ 'test.mjs': async () => ({ update() { updated = true; } }) });
+    host.update(0);
+    assert.equal(updated, true);
+    host.dispose();
+    for (const path of [renderer, entry]) {
+      const syntax = spawnSync(process.execPath, ['--check', join(out, path)], { encoding: 'utf8' });
+      assert.equal(syntax.status, 0, syntax.stderr);
+    }
   } finally {
     await rm(out, { recursive: true, force: true });
   }
