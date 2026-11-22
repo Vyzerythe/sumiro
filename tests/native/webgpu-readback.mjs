@@ -4,6 +4,7 @@ import { create, globals } from 'webgpu';
 import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
 import { mix, uniform, vec3, vec4 } from 'three/tsl';
 import { createChapterPreview } from '../../src/application/chapter-preview.mts';
+import { createTraversalPreview } from '../../src/application/traversal-preview.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
 import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
 import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
@@ -310,10 +311,11 @@ try {
 }
 
 const assetURL = new URL('../../sumiro/assets/', import.meta.url);
+const chapterAssets = { assetBaseURL: assetURL, fetch: async path => new Response(await readFile(new URL(path))) };
 const chapter = await createChapterPreview({
   canvas,
   viewport: { width: 96, height: 72, pixelRatio: 1 },
-  assets: { assetBaseURL: assetURL, fetch: async path => new Response(await readFile(new URL(path))) },
+  assets: chapterAssets,
   gpu: nativeGpu,
 });
 try {
@@ -334,4 +336,38 @@ try {
   console.log('Chapter geometry WebGPU readback', JSON.stringify({ meshes, backgroundPixel, center: scan[12] }));
 } finally {
   await chapter.dispose();
+}
+
+const traversal = await createTraversalPreview({
+  canvas,
+  viewport: { width: 96, height: 72, pixelRatio: 1 },
+  assets: chapterAssets,
+  input: { keyboardTarget },
+  gpu: nativeGpu,
+});
+try {
+  const registry = traversal.context.registry;
+  const spawn = registry.get('player.position');
+  assert.equal(spawn.state, 'IDLE');
+  assert.equal(spawn.grounded, true);
+  device.pushErrorScope('validation');
+  traversal.render();
+  const startingPixel = await sample(48, 58);
+  const skyPixel = await sample(48, 8);
+  assert.ok(Math.abs(startingPixel[0] - skyPixel[0]) > 10, 'the rendered path is distinct from the sky');
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
+  for (let frame = 0; frame < 60; frame++) traversal.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyW' }));
+  const movement = registry.get('player.position');
+  assert.ok(movement.z < spawn.z - 3);
+  assert.equal(movement.state, 'RUN');
+  assert.equal(movement.grounded, true);
+  assert.equal(traversal.context.camera.position.z, movement.z);
+  pendingFrame(performance.now());
+  traversal.render();
+  const error = await device.popErrorScope();
+  assert.equal(error, null, error?.message);
+  console.log('Chapter traversal WebGPU readback', JSON.stringify({ spawn, movement, startingPixel, skyPixel }));
+} finally {
+  await traversal.dispose();
 }

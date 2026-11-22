@@ -1,6 +1,9 @@
-import { Box3, Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, Sphere } from 'three/webgpu';
+import { Box3, Color, DirectionalLight, Group, HemisphereLight, PerspectiveCamera, Scene, Sphere } from 'three/webgpu';
+import type { Object3D } from 'three/webgpu';
 import { disposeGLTF } from '../assets/asset-manager.mts';
+import { firstChapterId } from '../domain/chapters.mts';
 import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
+import { createChapterManager } from '../runtime/chapter-manager.mts';
 import { createSourceRuntime } from '../runtime/source-runtime.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
@@ -40,15 +43,24 @@ export async function createChapterPreview({ canvas, ...options }: ChapterPrevie
     systems: {
       './chapter-geometry.mts': async () => ({
         async init(context, lifetime) {
-          const model = await context.assets.loadGLTF('levels/ch1_climb/pieces.glb', {
-            displaySpace: false, signal: lifetime.signal,
+          const stage = lifetime.ownRoot(new Group());
+          const chapters = createChapterManager<Object3D, Sphere>({
+            scene: stage,
+            async load(id, resources) {
+              if (id !== firstChapterId) throw Error(`Geometry preview is unavailable for ${id}`);
+              const model = await context.assets.loadGLTF('levels/ch1_climb/pieces.glb', {
+                displaySpace: false, signal: resources.signal,
+              });
+              resources.defer(() => disposeGLTF(model));
+              resources.signal.throwIfAborted();
+              const box = new Box3().setFromObject(model.scene);
+              if (box.isEmpty()) throw Error('Chapter geometry contains no bounded meshes');
+              return { root: model.scene, data: box.getBoundingSphere(new Sphere()) };
+            },
           });
-          lifetime.defer(() => disposeGLTF(model));
-          lifetime.signal.throwIfAborted();
-          const box = new Box3().setFromObject(model.scene);
-          if (box.isEmpty()) throw Error('Chapter geometry contains no bounded meshes');
-          box.getBoundingSphere(bounds);
-          lifetime.ownRoot(model.scene);
+          lifetime.defer(() => chapters.dispose());
+          const chapter = await chapters.switchTo(firstChapterId, { signal: lifetime.signal });
+          bounds.copy(chapter.data);
           frameChapter();
         },
         beforeRender: frameChapter,

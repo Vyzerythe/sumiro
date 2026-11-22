@@ -94,7 +94,7 @@ A second player subsystem is now source-backed: `src/player/ledge-path.mjs` reco
 
 ### Interactive player steering
 
-The source-backed development player now also calls `src/player/input-steering.mjs` from its live input update function. This covers camera-relative movement direction, analog stick magnitude, scripted movement overrides, zone transition heading locks, gradual yaw correction, and jump buffering. Differential tests compare an extracted original player function against the readable implementation using stateful multi-frame sequences and edge cases. **The full walking/jumping/climbing controller remains compiled.** Title-screen browser parity is a necessary smoke gate, not proof of in-game movement behavior.
+The source-backed development player calls `src/player/input-steering.mts` from its live input update function. This covers camera-relative movement direction, analog stick magnitude, scripted movement overrides, zone transition heading locks, gradual yaw correction, and jump buffering. Differential tests compare an extracted original player function against the readable implementation using stateful multi-frame sequences and edge cases. **The full walking/jumping/climbing controller remains compiled.** Title-screen browser parity is a necessary smoke gate, not proof of in-game movement behavior.
 
 ## Sandbox gameplay regression gate
 
@@ -102,7 +102,7 @@ The published game's own `?play=1` URL mode bypasses the title-card transition a
 
 ### Gait, jump, and fall transitions
 
-The source-backed development player now calls `src/player/locomotion.mjs` for grounded gait classification, movement-facing fallback, initial jump impulses, and fall transitions. The original player module continues to own its action state machine and passes its existing animation, footstep, carrier-detachment and state-change hooks into the reconstructed functions. `tests/player-locomotion-parity.test.mjs` evaluates both implementations against the published player function bodies using boundary-speed and seeded event/state fixtures. This is a bounded recovery of movement transitions, **not** a complete replacement of acceleration, gravity integration, landing, or climbing.
+The source-backed development player calls `src/player/locomotion.mts` for grounded gait classification, movement-facing fallback, initial jump impulses, and fall transitions. The original player module continues to own its action state machine and passes its existing animation, footstep, carrier-detachment and state-change hooks into the reconstructed functions. `tests/player-locomotion-parity.test.mjs` evaluates both implementations against the published player function bodies using boundary-speed and seeded event/state fixtures.
 
 ### Recovery: player movement tuning and jump browser regression
 
@@ -124,7 +124,9 @@ The original player module's contiguous leap subsystem (target selection, rim in
 
 ### Integrated player ground, air and landing physics
 
-The isolated development player now delegates its ground sweep/support test, airborne control/gravity/ledge transitions and landing effects to `src/player/motion-physics.mjs`. The copied player retains runtime hooks for collision-world queries, HUD/audio, animation, damage, mantling, ledge acquisition and buffered jumps. `tests/player-motion-physics-parity.test.mjs` compares the extracted published functions with reconstructed behavior across support, wall, gravity, carriers, jump-cut, collision and landing cases (including deterministic randomized inputs). The Chromium sandbox checks walking and jumping on actual WebGL-loaded scenes; it does not establish complete climbing/combat/visual parity or source-only production bundling.
+The isolated development player delegates its ground sweep and support test, airborne control and ledge transitions, and landing effects to `src/player/motion-physics.mts`. The copied player retains runtime hooks for collision-world queries, HUD/audio, animation, damage, mantling, ledge acquisition and buffered jumps. `tests/player-motion-physics-parity.test.mjs` compares the extracted published functions with reconstructed behavior across support, wall, gravity, carriers, jump-cut, collision and landing cases (including deterministic randomized inputs).
+
+The source traversal test drives the typed input sampler and grounded controller on the actual Chapter One terrain at 60 Hz. It checks the published spawn, running with keyboard input, and settling when input is released. The native gameplay camera accepts authored rail samplers and has separate obstacle, clearance, and teleport tests.
 
 ### Authored Chapter One leap diagnostic (reference-first)
 

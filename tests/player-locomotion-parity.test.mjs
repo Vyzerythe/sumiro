@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 import {
   classifyGroundGait, selectTravelDirection, beginJump, beginFall,
-} from '../src/player/locomotion.mjs';
+} from '../src/player/locomotion.mts';
 
 const bundle = await readFile(new URL('../sumiro/bundle/player-1_KrBWnI.js', import.meta.url), 'utf8');
 function extract(pattern, label) {

@@ -4,8 +4,108 @@
  * This is a compatible replacement for a bounded player-physics slice,
  * not a new movement design or the original unbundled source.
  */
-const clamp=(x,min,max)=>Math.min(Math.max(x,min),max);
-function wrapAngle(x) {
+import type { MovingTriangleBody } from '../physics/moving-body.mts';
+import type { CapsuleHit, CapsuleOptions, CollisionPosition, CollisionSurface, CollisionWorld } from '../physics/world.mts';
+import type { movementConfig } from './movement-config.mjs';
+
+type MovementConfig = typeof movementConfig;
+type ChangeState = (state: string) => void;
+type SurfaceName = (surface: CollisionSurface) => CollisionSurface;
+type PlayClip = (name: string, options: { fade: number; speed?: number }) => void;
+
+interface HorizontalMotion extends CollisionPosition {
+  vx: number;
+  vz: number;
+}
+
+interface SurfaceMotion extends HorizontalMotion {
+  surface: CollisionSurface;
+  lastGroundY: number;
+}
+
+export interface GroundContactState extends SurfaceMotion {
+  carrier: MovingTriangleBody | null;
+  drift: { x: number; z: number };
+}
+
+export interface AirborneState extends SurfaceMotion {
+  vy: number;
+  speed: number;
+  stickX: number;
+  stickZ: number;
+  stickMag: number;
+  heading: number;
+  state: string;
+  stateT: number;
+  jumpCut: boolean;
+  guardsInAir: boolean;
+  drift: { x: number; z: number; air: number };
+  noGrab: number;
+  fromY: number;
+}
+
+export interface LandingState extends HorizontalMotion {
+  carrier: MovingTriangleBody | null;
+  grounded: boolean;
+  guardsInAir: boolean;
+  vy: number;
+  coyote: number;
+  fade: number;
+  dissolve: number;
+  rootY: number;
+  lastGroundY: number;
+  airDashed: boolean;
+  landHeavy: boolean;
+  stickMag: number;
+  jumpBuf: number;
+}
+
+interface CollisionEffects {
+  world: Pick<CollisionWorld, 'sweepCapsule' | 'groundAt'>;
+  collision: CapsuleHit;
+  deflect(collision: CapsuleHit): void;
+  surfaceName: SurfaceName;
+}
+
+export interface GroundContactEffects extends CollisionEffects {
+  bodyCapsule: CapsuleOptions;
+  probeOffset: number;
+  hasSupport(x: number, z: number): boolean;
+  hasSafeDrop(x: number, z: number, dx: number, dz: number): boolean;
+  hasHigherGround(x: number, z: number, dx: number, dz: number): boolean;
+  estimateNormal(x: number, z: number, fallbackX: number, fallbackZ: number, collision: CapsuleHit): void;
+}
+
+export interface AirborneEffects<Mantle> extends CollisionEffects {
+  jumpHeld: boolean;
+  guardedCapsule: CapsuleOptions;
+  normalCapsule: CapsuleOptions;
+  groundTolerance: number;
+  play: PlayClip;
+  changeState: ChangeState;
+  grabLedge(): boolean;
+  land(dropHeight: number): void;
+  tryWallMantle(): boolean;
+  probeMantle(): Mantle | null;
+  beginMantle(mantle: Mantle): void;
+  updateFall(): void;
+}
+
+export interface LandingEffects {
+  world: Pick<CollisionWorld, 'groundAt'>;
+  shake(strength: number): void;
+  sound(name: string): void;
+  hurt(reason: string): void;
+  isDead(): boolean;
+  die(): void;
+  play: PlayClip;
+  footstep(side: 'R' | 'L', action: 'land', force: boolean): void;
+  changeState: ChangeState;
+  consumeBufferedJump(): void;
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+function wrapAngle(x: number) {
   let out=(x+Math.PI)%(Math.PI*2);
   if(out<0)out+=Math.PI*2;
   return out-Math.PI;
@@ -16,7 +116,8 @@ function wrapAngle(x) {
  * Returns the original supported-ground boolean. Mutable collision result
  * and callbacks are provided by the original controller.
  */
-export function stepGroundContact(state,delta,config,effects) {
+export function stepGroundContact(state: GroundContactState, delta: number,
+  config: Pick<MovementConfig, 'stepUp' | 'stepDown'>, effects: GroundContactEffects) {
   const {world,collision,bodyCapsule}=effects;
   world.sweepCapsule(state,(state.vx+state.drift.x)*delta,
     (state.vz+state.drift.z)*delta,bodyCapsule,collision);
@@ -73,7 +174,8 @@ export function stepGroundContact(state,delta,config,effects) {
  * Original airborne frame integration. Gameplay hooks cover grabbing,
  * mantling, landing, damage/fade, audio and animation.
  */
-export function stepAirborne(state,delta,config,effects) {
+export function stepAirborne<Mantle,>(state: AirborneState, delta: number,
+  config: Pick<MovementConfig, 'airMin' | 'airAccel' | 'jumpCut' | 'gravity'>, effects: AirborneEffects<Mantle>) {
   let velocity=Math.hypot(state.vx,state.vz);
   if(state.stickMag>.1) {
     const desiredSpeed=Math.max(velocity,config.airMin);
@@ -137,7 +239,8 @@ export function stepAirborne(state,delta,config,effects) {
 }
 
 /** Land after a drop or jump, with carrier momentum and heavy-fall effects. */
-export function finishLanding(state,dropHeight,config,effects) {
+export function finishLanding(state: LandingState, dropHeight: number,
+  config: Pick<MovementConfig, 'heavyFall'>, effects: LandingEffects) {
   state.carrier=effects.world.groundAt(state.x,state.z,
     state.y+.2,state.y-.3)?.body??null;
   if(state.carrier) {

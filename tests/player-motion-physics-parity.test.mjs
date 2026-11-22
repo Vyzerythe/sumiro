@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 import {
   stepGroundContact, stepAirborne, finishLanding,
-} from '../src/player/motion-physics.mjs';
+} from '../src/player/motion-physics.mts';
 import { movementConfig } from '../src/player/movement-config.mjs';
 
 const published=await readFile(new URL('../sumiro/bundle/player-1_KrBWnI.js',import.meta.url),'utf8');

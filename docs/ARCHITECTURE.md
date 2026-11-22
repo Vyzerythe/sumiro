@@ -28,7 +28,7 @@ The `assets/` hierarchy groups media by purpose (for example `audio/`, `backdrop
 | `.local-build/` | Transitional gameplay build. Pinned adapters load readable domain, collision, player and frame-sizing code into the published runtime. |
 | `src/rendering/` | Native Three.js r187 device lifecycle, TSL surface data, edge analysis, composite and grade. The opt-in Dawn harness reads back GPU pixels. |
 | `src/runtime/source-runtime.mts` | Composes native rendering, system hosting, assets, audio, timing, and teardown. |
-| `.local-build-source/` | Local native application preview. Loads actual Chapter One geometry from `sumiro/assets/` through the source runtime. |
+| `.local-build-source/` | Local native application preview. Loads Chapter One geometry and supports grounded traversal of the chapter's decoded terrain with `?walk=1`. |
 
 The target is a source-only TypeScript application that uses the native WebGPU renderer for gameplay. The preview proves the source composition can load and draw repository geometry on WebGPU. Scene assembly, gameplay, materials, remaining render effects, and end-to-end gameplay verification are still in progress.
 

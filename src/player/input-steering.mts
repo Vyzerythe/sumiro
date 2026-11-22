@@ -6,28 +6,52 @@
  * Preserve angle wrap, zone locking, scripted steering and jump buffering.
  */
 
-function wrapAngle(angle) {
+import type { InputManager } from '../input/input-manager.mts';
+
+export interface SteeringState<Zone = string> {
+  state: string;
+  zone: Zone | null;
+  holdActive: boolean;
+  yaw: number;
+  holdYaw: number;
+  holdAngle: number;
+  grounded: boolean;
+  stickX: number;
+  stickZ: number;
+  stickMag: number;
+  stickAngle: number;
+  jumpBuf: number;
+}
+
+interface CameraSteering<Zone> {
+  railYaw?: number;
+  zone?: Zone | null;
+}
+
+interface ScriptedSteering {
+  x: number;
+  z: number;
+  mag?: number;
+}
+
+function wrapAngle(angle: number) {
   let result = (angle + Math.PI) % (Math.PI * 2);
   if (result < 0) result += Math.PI * 2;
   return result - Math.PI;
 }
-function clamp(value, low, high) {
+function clamp(value: number, low: number, high: number) {
   return Math.min(Math.max(value, low), high);
 }
 
 /**
  * Mutates the live player state, as the original closure does.
  *
- * @param {object} state Player controller state.
- * @param {object} input Input state.
- * @param {object|null} rail Current camera rail state.
- * @param {object|null} script Scripted motion override, if any.
- * @param {number} delta Frame duration in seconds.
- * @param {number} jumpBuffer Jump-buffer duration.
- * @param {number} holdYawRate Maximum yaw correction factor (published: 1.6).
+ * Uses the camera rail heading, unless a scripted movement supplies direction.
  */
-export function updateInputSteering(
-  state, input, rail, script, delta, jumpBuffer, holdYawRate,
+export function updateInputSteering<Zone,>(
+  state: SteeringState<Zone>, input: Pick<InputManager, 'forward' | 'strafe' | 'jump'>,
+  rail: CameraSteering<Zone> | null, script: ScriptedSteering | null,
+  delta: number, jumpBuffer: number, holdYawRate: number,
 ) {
   const cameraYaw = (rail?.railYaw ?? 0) * (Math.PI / 180);
   const zone = rail?.zone ?? null;

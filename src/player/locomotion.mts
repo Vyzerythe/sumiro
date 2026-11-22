@@ -4,8 +4,46 @@
  * Preserve the published thresholds, input fallbacks and in-place mutations.
  */
 
+import type { movementConfig } from './movement-config.mjs';
+
+type MovementConfig = typeof movementConfig;
+
+interface GroundVelocity { vx: number; vz: number }
+interface TravelDirection {
+  heading: number;
+  stickX: number;
+  stickZ: number;
+  stickMag: number;
+}
+
+export interface FallState {
+  y: number;
+  vy: number;
+  grounded: boolean;
+  coyote: number;
+  fromY: number;
+  guardsInAir: boolean;
+}
+
+export interface JumpState extends FallState, GroundVelocity, Pick<TravelDirection, 'stickX' | 'stickZ' | 'stickMag'> {
+  state: string;
+  braking: boolean;
+  recentSpeed: number;
+  jumpCut: boolean;
+}
+
+interface FallEffects {
+  detach(): void;
+  play(name: string, options: { fade: number }): void;
+  setState(name: string): void;
+}
+
+interface JumpEffects extends FallEffects {
+  footstep(side: 'L', action: 'takeoff', heavy: boolean): void;
+}
+
 /** Match the four published grounded locomotion bands. */
-export function classifyGroundGait(state) {
+export function classifyGroundGait(state: GroundVelocity & { state: string; stateT: number }) {
   const velocity = Math.hypot(state.vx, state.vz);
   const gait = velocity < .15 ? 'IDLE' :
     velocity < 2.8 ? 'WALK' :
@@ -17,7 +55,7 @@ export function classifyGroundGait(state) {
 }
 
 /** Return the normalized movement or facing direction in the existing output. */
-export function selectTravelDirection(state, out) {
+export function selectTravelDirection(state: GroundVelocity & TravelDirection, out: { x: number; z: number }) {
   const speed = Math.hypot(state.vx, state.vz);
   if (state.stickMag > .1) {
     out.x = state.stickX / state.stickMag;
@@ -33,7 +71,7 @@ export function selectTravelDirection(state, out) {
  * carrier-detachment, sound and state transition side effects.
  * No new physics or movement policy is introduced.
  */
-export function beginJump(state, config, effects) {
+export function beginJump(state: JumpState, config: Pick<MovementConfig, 'gravity' | 'jumpHeight'>, effects: JumpEffects) {
   if ((state.braking || state.state === 'TEETER') &&
     state.stickMag > .1 &&
     state.recentSpeed > Math.hypot(state.vx, state.vz)) {
@@ -54,7 +92,7 @@ export function beginJump(state, config, effects) {
 }
 
 /** Original airborne fall transition from a grounded or moving state. */
-export function beginFall(state, config, effects, verticalSpeed = 0) {
+export function beginFall(state: FallState, config: Pick<MovementConfig, 'coyote'>, effects: FallEffects, verticalSpeed = 0) {
   state.vy = verticalSpeed;
   effects.detach();
   state.grounded = false;

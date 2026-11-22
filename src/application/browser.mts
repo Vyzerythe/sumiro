@@ -1,4 +1,5 @@
 import { createChapterPreview } from './chapter-preview.mts';
+import { createTraversalPreview } from './traversal-preview.mts';
 
 const canvas = document.querySelector('canvas');
 const status = document.querySelector<HTMLElement>('[role="status"]');
@@ -18,10 +19,12 @@ window.addEventListener('pagehide', event => {
 }, { signal: page.signal });
 
 const assetBaseURL = new URL('../sumiro/assets/', document.baseURI);
+const walk = new URLSearchParams(window.location.search).get('walk') === '1';
 try {
-  const runtime = await createChapterPreview({
-    canvas, viewport: viewport(canvas), assets: { assetBaseURL },
-  });
+  const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
+  const runtime = walk
+    ? await createTraversalPreview({ ...options, input: { keyboardTarget: window, getGamepads: () => navigator.getGamepads() } })
+    : await createChapterPreview(options);
   if (page.signal.aborted) {
     await runtime.dispose();
   } else {
@@ -44,7 +47,11 @@ try {
       observer.disconnect();
       void runtime.dispose().catch(error => console.error(error));
     }, { once: true });
-    status.hidden = true;
+    status.hidden = !walk;
+    if (walk) {
+      status.textContent = 'WASD or arrow keys to move';
+      runtime.start();
+    }
     observer.observe(canvas);
   }
 } catch (error) {
