@@ -5,6 +5,7 @@ type RunStorage = Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>>;
 type Run = LoadedSave & {
   shrine: string | null;
   flags: Record<string, unknown>;
+  seen: Record<string, unknown>;
   abilities: ChapterAbilities;
   playS: number;
 };
@@ -20,7 +21,7 @@ function recoverRun(saved: LoadedSave | null): Run {
     if (enabled === true) Object.defineProperty(abilities, key, { value: true, writable: true, enumerable: true, configurable: true });
   }
   return {
-    ...data, abilities, flags: record(data.flags),
+    ...data, abilities, flags: record(data.flags), seen: record(data.seen),
     shrine: typeof data.shrine === 'string' ? data.shrine : null,
     playS: typeof data.playS === 'number' && Number.isFinite(data.playS) && data.playS >= 0 ? data.playS : 0,
   };
@@ -65,6 +66,9 @@ export function createRunProgress(storage: RunStorage) {
     setFlag(flag: string) {
       Object.defineProperty(run.flags, flag, { value: true, enumerable: true, configurable: true, writable: true });
       return persist();
+    },
+    markSeen(key: string) {
+      Object.defineProperty(run.seen, key, { value: true, enumerable: true, configurable: true, writable: true });
     },
     /** Commit progression after the incoming chapter has activated. */
     async completeChapter(activate: (id: string) => Promise<unknown>) {

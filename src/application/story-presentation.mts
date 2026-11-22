@@ -7,10 +7,11 @@ import type { AnimatedPlayer } from '../player/animated-player.mts';
 import type { createTraversalController } from '../player/traversal-controller.mts';
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
 import { chapterOneGroundRegions } from './chapter-one-terrain.mts';
+import { createLanternRestScene, type LanternRestCommand } from './lantern-rest-scene.mts';
 import type { loadCompanionPresentation } from './companion-presentation.mts';
 import {
   createStorySceneController, storySceneSites,
-  type ScenePoint, type SceneShot, type StoryActor, type StorySceneCommand, type StorySceneId,
+  type ScenePoint, type SceneShot, type StoryActor, type StorySceneCommand, type StorySceneEffects, type StorySceneId,
 } from './story-scenes.mts';
 
 type Player = ReturnType<typeof createTraversalController>;
@@ -21,7 +22,7 @@ type Walk = Extract<StorySceneCommand, { type: 'walk' }>;
 type Face = Extract<StorySceneCommand, { type: 'face' }>;
 
 interface StoryPresentationOptions {
-  id: StorySceneId;
+  id: StorySceneId | null;
   root: Object3D;
   lifetime: ChapterLifetime;
   player: Player;
@@ -31,7 +32,7 @@ interface StoryPresentationOptions {
   camera: PerspectiveCamera;
   world: CollisionWorld;
   audio: ReturnType<typeof createAudioCues> | undefined;
-  onActive(id: StorySceneId | null): void;
+  onActive(id: StorySceneId | 'lantern_rest' | null): void;
   onSubtitle(text: string | null): void;
 }
 
@@ -72,6 +73,7 @@ export function createStoryPresentation({
   let shot: { cue: SceneShot; blend: number; time: number; from: Vector3; toward: Vector3 } | undefined;
   let playerClip: { name: string; time: number; speed: number; fade: number; duration: number } | undefined;
   let playerTurn: { command: Face; complete: boolean } | undefined;
+  let catTurn: { heading: number; complete: boolean } | undefined;
   let catMotion: { from: Vector3; target: 'hands' | 'shoulder' | ScenePoint; time: number; duration: number; hop: boolean } | undefined;
   let held: 'hands' | 'shoulder' | null = null;
   let dwell = 0;
@@ -98,8 +100,16 @@ export function createStoryPresentation({
     return { done: () => motion.time >= motion.duration };
   }
 
-  const controller = createStorySceneController({
-    begin(current) {
+  function clearScene() {
+    onActive(null);
+    onSubtitle(null);
+    shot = playerClip = playerTurn = catTurn = catMotion = undefined;
+    held = null;
+    walks.clear();
+    followUps.clear();
+  }
+
+  function beginScene(current: StorySceneId | 'lantern_rest') {
       const { x, z, heading } = player.state;
       player.reset({ x, z, heading });
       held = companion.state.phase === 'CARRIED' ? 'shoulder' : null;
@@ -114,9 +124,21 @@ export function createStoryPresentation({
         }
       }
       onActive(current);
-    },
-    apply(command, signal) {
+  }
+
+  function apply(command: LanternRestCommand, signal: AbortSignal) {
       switch (command.type) {
+        case 'lantern-hop':
+          cat.play('jump_down', .15, { loop: false, restart: true });
+          return lift(command.point, .45, true);
+        case 'lantern-turn': {
+          const turn = { heading: command.heading, complete: false };
+          catTurn = turn;
+          return { done: () => turn.complete };
+        }
+        case 'lantern-rig':
+          if (command.pose === 'hands' || command.pose === 'lift') return lift('hands', command.seconds);
+          break;
         case 'shot':
           shot = { cue: command.shot, blend: command.blend, time: 0,
             from: camera.position.clone(), toward: camera.getWorldDirection(new Vector3()) };
@@ -185,14 +207,13 @@ export function createStoryPresentation({
           }
           return lift('hands', command.seconds ?? .55);
       }
-    },
+  }
+
+  const effects: StorySceneEffects = {
+    begin: beginScene,
+    apply,
     finish(result) {
-      onActive(null);
-      onSubtitle(null);
-      shot = playerClip = playerTurn = catMotion = undefined;
-      held = null;
-      walks.clear();
-      followUps.clear();
+      clearScene();
       if (result.player) {
         const [x, , z] = result.player.point;
         player.reset({ x, z, heading: result.player.heading });
@@ -227,13 +248,30 @@ export function createStoryPresentation({
     heading(name) { return name === 'player' ? player.state.heading : (rigs.get(name)?.root.rotation.y ?? Math.PI) - Math.PI; },
     ground,
     duration(name, clip) { return name === 'player' ? actor.duration(clip) : rigs.get(name)?.duration(clip); },
+  };
+  const controller = createStorySceneController(effects);
+  const rest = createLanternRestScene({
+    begin() { beginScene('lantern_rest'); },
+    apply,
+    point(name) {
+      if (name === 'camera') return camera.position.toArray();
+      return effects.point?.(name) ?? [player.state.x, player.state.y, player.state.z];
+    },
+    heading: name => effects.heading?.(name),
+    ground,
+    duration: clip => actor.duration(clip),
+    finish() {
+      clearScene();
+      actor.reset(player.state);
+      cat.play('ride', .2);
+    },
   });
   if (id === 'reunion') for (const name of familyNames) {
     const rig = cat.family(root, lifetime, name);
     rig.root.visible = false;
     rigs.set(name, rig);
   }
-  lifetime.defer(() => controller.dispose());
+  lifetime.defer(() => { controller.dispose(); rest.dispose(); });
 
   function advanceWalks(delta: number) {
     let vx = 0, vz = 0;
@@ -282,6 +320,15 @@ export function createStoryPresentation({
         playerTurn = undefined;
       } else player.moveCombat(0, 0, player.state.heading + Math.sign(difference) * allowance);
     }
+    if (catTurn) {
+      const difference = wrapAngle(catTurn.heading + Math.PI - cat.root.rotation.y);
+      const allowance = delta * 3.2;
+      cat.root.rotation.y += Math.sign(difference) * Math.min(allowance, Math.abs(difference));
+      if (Math.abs(difference) <= allowance) {
+        catTurn.complete = true;
+        catTurn = undefined;
+      }
+    }
     const clip = playerClip;
     if (clip) clip.time = clamp01((clip.time + delta * clip.speed) / clip.duration) * clip.duration;
     actor.update({ ...player.state, ...speed }, delta,
@@ -328,9 +375,12 @@ export function createStoryPresentation({
 
   return {
     get complete() { return completed; },
-    get active() { return controller.active !== null; },
+    get active() { return controller.active !== null || rest.active; },
+    rest(shrine: Parameters<typeof rest.start>[0]) {
+      return !controller.active && rest.start(shrine, { carried: companion.state.phase === 'CARRIED', signal: lifetime.signal });
+    },
     trigger(delta: number, duelCleared: boolean) {
-      if (completed || controller.active) return;
+      if (!id || completed || controller.active || rest.active) return;
       const { grounded, x, y, z } = player.state;
       if (id === 'reunion') {
         if (grounded && duelCleared && pointInPolygon(x, z, storySceneSites.reunion.trigger.poly)) {
@@ -353,11 +403,14 @@ export function createStoryPresentation({
       if (controller.active) {
         controller.step(delta);
         if (controller.active) animate(delta);
+      } else if (rest.active) {
+        rest.step(delta);
+        if (rest.active) animate(delta);
       } else if (completed) {
         for (const name of familyNames) rigs.get(name)?.advance(delta);
       }
     },
     presentCamera,
-    skip: controller.skip,
+    skip() { return controller.skip() || rest.skip(); },
   };
 }

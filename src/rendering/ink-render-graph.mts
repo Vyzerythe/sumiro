@@ -1,17 +1,19 @@
-import { LinearFilter, NoColorSpace, type Node, type OrthographicCamera, type PassNode, type PerspectiveCamera } from 'three/webgpu';
-import { Fn, If, rtt, texture3D } from 'three/tsl';
+import { LinearFilter, NoColorSpace, type Node, type OrthographicCamera, type PassNode, type PerspectiveCamera, type Scene } from 'three/webgpu';
+import { Fn, If, clamp, pass, rtt, screenUV, texture3D, uvec2, vec2, vec3, vec4 } from 'three/tsl';
 import { createInkComposite } from './ink-composite.mts';
 import { createInkEdgeAnalysis } from './ink-edge.mts';
 import { createInkGrade } from './ink-grade.mts';
 import { createInkNoiseTexture, type InkWashControls } from './ink-paper-wash.mts';
 import { configureInkSurfacePass } from './ink-surface-pass.mts';
-import { createInkSurfaceSky, createInkWashSheet, type InkWashSheet } from './ink-surface-sky.mts';
+import { INK_PAPER_BASE, createInkSurfaceSky, createInkWashSheet, type InkWashSheet } from './ink-surface-sky.mts';
 import { createSeaShoreline, type SeaShorelineInputs } from './sea-shoreline.mts';
 import { blendSeaReflection, createSeaReflectionPass } from './sea-reflection.mts';
+import { textureSize2D } from './texture-size.mts';
 import type { WebGpuOutputGraph } from './webgpu-renderer.mts';
 
 type InkSettings = NonNullable<Parameters<typeof createInkComposite>[2]> & {
   paper?: { strength?: number };
+  background?: { scene: Scene; camera: PerspectiveCamera | OrthographicCamera; enabled: Node<'bool'> };
   washSheets?: readonly (Omit<InkWashSheet, 'noise'> & { controls?: InkWashControls })[];
   sea?: Omit<SeaShorelineInputs, 'depth' | 'noise'> & { enabled: Node<'bool'>; reflection?: boolean };
   noiseSeed?: number;
@@ -31,6 +33,7 @@ export function createInkRenderGraph(
     null, null, textureOptions);
   let volume: ReturnType<typeof createInkNoiseTexture> | undefined;
   let seaReflection: ReturnType<typeof createSeaReflectionPass> | undefined;
+  let backgroundPass: PassNode | undefined;
   try {
     let layer = createInkComposite({ ...attachments, edge }, camera, settings);
     if (settings.paper || settings.washSheets?.length || settings.sea) {
@@ -56,6 +59,25 @@ export function createInkRenderGraph(
         layer = createInkWashSheet(layer, attachments.depth, camera, { noise, ...sheet }, controls);
       }
     }
+    const background = settings.background;
+    if (background) {
+      const dedicated = pass(background.scene, background.camera, textureOptions);
+      backgroundPass = dedicated;
+      const draw = dedicated.updateBefore.bind(dedicated);
+      dedicated.updateBefore = frame => { if (background.scene.children.length) draw(frame); };
+      const backColor = dedicated.getTextureNode('output');
+      const base = layer;
+      const size = textureSize2D(attachments.depth);
+      const rawDepth = attachments.depth.load(uvec2(clamp(screenUV.mul(size), vec2(0), size.sub(1)))).r;
+      layer = Fn(() => {
+        const result = base.toVar();
+        If(background.enabled.and(rawDepth.equal(1)), () => {
+          const inkedPaper = result.rgb.div(vec3(...INK_PAPER_BASE));
+          result.assign(vec4(backColor.sample(screenUV).rgb.mul(inkedPaper), result.a));
+        });
+        return result;
+      })();
+    }
     const composite = rtt(layer, null, null, textureOptions);
     try {
       const outputNode = createInkGrade(composite);
@@ -66,13 +88,16 @@ export function createInkRenderGraph(
           edge.setResolutionScale(scale);
           composite.setResolutionScale(scale);
           seaReflection?.setResolutionScale(scale);
+          backgroundPass?.setResolutionScale(scale);
         },
         dispose() {
           if (disposed) return;
           disposed = true;
           try { composite.dispose(); } finally {
             try { edge.dispose(); } finally {
-              try { seaReflection?.dispose(); } finally { volume?.dispose(); }
+              try { seaReflection?.dispose(); } finally {
+                try { backgroundPass?.dispose(); } finally { volume?.dispose(); }
+              }
             }
           }
         },
@@ -85,7 +110,9 @@ export function createInkRenderGraph(
     }
   } catch (error) {
     try { edge.dispose(); } finally {
-      try { seaReflection?.dispose(); } finally { volume?.dispose(); }
+      try { seaReflection?.dispose(); } finally {
+        try { backgroundPass?.dispose(); } finally { volume?.dispose(); }
+      }
     }
     throw error;
   }

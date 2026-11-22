@@ -1,5 +1,6 @@
 /** The first Chapter Two duel from ch2_pass-9Opjv4P2.js and combat-Dp_zXhrv.js. */
 import { pointInPolygon, type PointXZ } from '../physics/geometry.mts';
+import type { StrokePool } from '../domain/run-vitals.mts';
 import type { CollisionPosition, CollisionWorld } from '../physics/world.mts';
 
 const FPS = 24;
@@ -101,6 +102,7 @@ export type SwordDuelEvent =
   | { type: 'attack-frame'; combo: Combo; x: number; y: number; z: number; heading: number; damage: number };
 
 export interface SwordDuelEffects {
+  health?: StrokePool;
   random?(): number;
   manualActivation?: boolean;
   onEvent?(event: SwordDuelEvent): void;
@@ -146,11 +148,12 @@ const groundGait = new Set(['IDLE', 'WALK', 'RUN', 'SPRINT']);
 const E = swordWraithEncounter;
 
 /** Drive the one-player, one-wraith court encounter from fixed simulation steps. */
-export function createSwordDuel(world: DuelWorld, { random = Math.random, onEvent, movePlayer, manualActivation = false }: SwordDuelEffects = {}) {
+export function createSwordDuel(world: DuelWorld, { random = Math.random, onEvent, movePlayer, manualActivation = false, health }: SwordDuelEffects = {}) {
   const emit = (event: SwordDuelEvent) => onEvent?.(event);
   const cue = (name: string) => emit({ type: 'cue', name });
+  let standaloneStrokes = 5;
   const player = { action: 'IDLE' as PlayerAction, clip: null as PlayerClip | null, frame: 0, elapsed: 0, heading: 0,
-    strokes: 5, swordOut: false, combo: null as Combo | null, riposte: 0 };
+    get strokes() { return health?.strokes ?? standaloneStrokes; }, swordOut: false, combo: null as Combo | null, riposte: 0 };
   const enemy = { ...E.spawn, x: E.spawn.x as number, z: E.spawn.z as number, y: 0, hp: E.health as number, maxHp: E.health, action: 'IDLE' as EnemyAction,
     elapsed: 0, visible: false, vx: 0, vz: 0, clip: 'idle_sword', frame: 0, opening: false, hitIn: null as number | null,
     pattern: null as string | null, dissolve: 0, yOffset: 0 };
@@ -262,7 +265,8 @@ export function createSwordDuel(world: DuelWorld, { random = Math.random, onEven
     }
     if (pose.state === 'DEATH' || pose.state === 'DEAD' || player.action === 'DEATH') return;
     invulnerable = 0.75;
-    player.strokes = Math.max(0, player.strokes - hit.dmg);
+    if (health) health.hurt(hit.dmg);
+    else standaloneStrokes = Math.max(0, standaloneStrokes - hit.dmg);
     stop = Math.max(stop, 0.07);
     emit({ type: 'player-hurt', amount: hit.dmg, strokes: player.strokes });
     emit({ type: 'shake', strength: 0.55 });
@@ -484,7 +488,8 @@ export function createSwordDuel(world: DuelWorld, { random = Math.random, onEven
   function reset({ cleared = false, strokes = 5 }: { cleared?: boolean; strokes?: number } = {}) {
     phase = cleared ? 'clear' : 'idle';
     playerAction('IDLE', null);
-    Object.assign(player, { strokes, swordOut: false, riposte: 0 });
+    standaloneStrokes = strokes;
+    Object.assign(player, { swordOut: false, riposte: 0 });
     enemyAction('IDLE', 'idle_sword');
     Object.assign(enemy, { ...E.spawn, y: 0, hp: cleared ? 0 : E.health, visible: false, vx: 0, vz: 0,
       pattern: null, hitIn: null, dissolve: 0, yOffset: 0 });

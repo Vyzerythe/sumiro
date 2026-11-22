@@ -166,9 +166,29 @@ test('Chapter One assembles the supplied GLBs, Draco geometry and look textures 
   assert.equal(root.getObjectByName('plateau_collision').visible, false);
   assert.equal(root.getObjectByName('fade_face').material.transparent, true);
   assert.equal(root.getObjectByName('fade_face').renderOrder, -10);
-  for (const name of ['wall_front', 'plateau_top']) {
-    const look = root.getObjectByName(name).material.map;
-    assert.ok(look.image.width > 0 && look.image.height > 0);
+  const plateauSource = await readFile(new URL('../sumiro/bundle/env_plateau-2JhtlrC-.js', import.meta.url), 'utf8');
+  const plateauStyles = Function(span(plateauSource, 'var h={preset:', ',v=`env_plateau`') + ';return _;')();
+  for (const [name, style, dimensions] of [
+    ['wall_front', plateauStyles.wall, [3840, 1440]],
+    ['plateau_top', plateauStyles.top, [2048, 1792]],
+  ]) {
+    const { material } = root.getObjectByName(name);
+    assert.equal(style.look, true);
+    assert.equal(material.map, null);
+    assert.equal(material.vertexColors, false);
+    const samples = [];
+    const colors = [];
+    material.colorNode.traverse(node => {
+      if (node.isSplitNode && node.node.isTextureNode) samples.push(node);
+      if (node.isConstNode && node.value?.isVector3) colors.push(node.value.toArray());
+    });
+    assert.deepEqual([...new Set(samples.map(sample => sample.components))].sort(), ['x', 'y', 'z']);
+    const textures = [...new Set(samples.map(sample => sample.node.value))];
+    assert.equal(textures.length, 1);
+    const [look] = textures;
+    assert.deepEqual([look.image.width, look.image.height], dimensions);
+    assert.ok(colors.some(color => color.every((channel, index) => channel === style.tint[index])));
+    assert.equal(look.colorSpace, NoColorSpace);
     assert.equal(look.flipY, false);
     assert.equal(look.wrapS, ClampToEdgeWrapping);
     assert.equal(look.wrapT, ClampToEdgeWrapping);

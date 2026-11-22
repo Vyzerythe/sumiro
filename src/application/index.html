@@ -17,6 +17,12 @@
     button:focus-visible { outline: 2px solid #decda7; outline-offset: 3px; }
     button:disabled { opacity: .5; }
     #pause-button { position: fixed; inset: 1rem 1rem auto auto; }
+    #vitals { position: fixed; inset: 1rem auto auto 1rem; pointer-events: none; filter: drop-shadow(0 0 .3rem #e7dcc1); }
+    #vitals > div { display: flex; gap: .4rem; align-items: center; }
+    #vitals img { width: auto; height: var(--icon-size); }
+    #vitals .spent { opacity: .28; }
+    .vital-strokes { --icon-size: 1.1rem; }
+    .vital-drinks { --icon-size: 1.75rem; margin-top: .4rem; }
     #credits { position: fixed; inset: 0; overflow: hidden; text-align: center; background: #11100e; color: #e7dcc1; font: italic clamp(1rem, 2.7vh, 1.65rem)/1.55 Georgia, serif; }
     #credits h2 { margin: 2.5rem 0 .5rem; font: normal .85em Georgia, serif; letter-spacing: .13em; text-transform: uppercase; }
     #credits p { margin: .35rem 0; }
@@ -46,10 +52,12 @@
     <button type="button" id="continue">Continue</button>
     <button type="button" id="new-run">New game</button>
   </section>
+  <div id="vitals" role="group" hidden></div>
   <button type="button" id="pause-button" hidden>Pause</button>
   <section class="menu" id="pause-menu" aria-labelledby="pause-heading" hidden>
     <h2 id="pause-heading">Paused</h2>
     <button type="button" id="resume">Resume</button>
+    <button type="button" id="restart-checkpoint">Restart from shrine</button>
     <button type="button" id="return-to-title">Quit to title</button>
   </section>
   <p role="status" hidden></p>

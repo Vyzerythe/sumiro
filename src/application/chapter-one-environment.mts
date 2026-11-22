@@ -1,7 +1,7 @@
 /** Visual assembly from the published cliff, bridge/stairs, plateau, gate and course systems. */
-import { BufferAttribute, ClampToEdgeWrapping, DoubleSide, Group, Mesh, MeshBasicMaterial,
+import { BufferAttribute, ClampToEdgeWrapping, Color, DoubleSide, Group, Mesh, MeshBasicMaterial,
   NoColorSpace, Raycaster, Texture, Vector3, type Material, type Node, type Object3D } from 'three/webgpu';
-import { clamp, texture, vec4 } from 'three/tsl';
+import { clamp, max, mix, smoothstep as shaderSmoothstep, texture, vec3, vec4, vertexColor } from 'three/tsl';
 import { disposeGLTF, type AssetManager } from '../assets/asset-manager.mts';
 import { createInkMaterial, type InkMaterialOptions } from '../rendering/ink-material.mts';
 import { bindInkMeshMaterials } from '../rendering/ink-mesh-materials.mts';
@@ -115,6 +115,37 @@ function prepareCrossing(root: Object3D, lifetime: ChapterLifetime) {
   });
 }
 
+const plateauLookStyles = {
+  wall: { tint: [1.012, 1, 0.975], cavity: 0.1, rampScale: 0.9, dry: 0.75, dryColor: 0xbfbfb5,
+    pool: 1, poolColor: 0x3e4040, poolDeep: 0x262829, directDry: true },
+  top: { tint: [1.004, 1, 0.985], cavity: 0.5, rampScale: 0.62, dry: 0.7, dryColor: 0xb7b9b5,
+    pool: 0.5, poolColor: 0x23292d, poolDeep: 0x13171a, directDry: false },
+} as const;
+
+function workingPigment(hex: number) {
+  const { r, g, b } = new Color(hex);
+  return vec3(r, g, b);
+}
+
+function plateauLookColor(lookMap: Texture, style: typeof plateauLookStyles[keyof typeof plateauLookStyles]) {
+  const look = texture(lookMap);
+  const paint = vertexColor();
+  // Use the shipped mask channels as value, dry brush and ink pool controls.
+  // Native lighting supplies the neutral base under those controls.
+  const value = look.r.sub(0.5).mul(1.1 * style.rampScale).add(1);
+  const cavity = mix(1, clamp(paint.r, 0, 1), style.cavity);
+  const stone = vec3(...style.tint).mul(value).mul(cavity);
+  const dry = max(look.g, paint.g);
+  const dryCoverage = style.directDry ? dry : shaderSmoothstep(0.47, 0.67, dry.sub(0.5).mul(0.8).add(0.5))
+    .mul(shaderSmoothstep(0.02, 0.22, dry));
+  const dryWeight = dryCoverage.mul(mix(style.dry, 0.95, shaderSmoothstep(0.55, 1, dry)));
+  const chalk = mix(stone, workingPigment(style.dryColor), dryWeight);
+  const pool = max(look.b, paint.b.mul(style.pool));
+  const ink = mix(workingPigment(style.poolColor), workingPigment(style.poolDeep), shaderSmoothstep(0.7, 0.92, pool));
+  const poolWeight = shaderSmoothstep(0.42, 0.56, pool).mul(mix(0.55, 0.98, shaderSmoothstep(0.15, 0.9, pool)));
+  return vec4(mix(chalk, ink, poolWeight), 1);
+}
+
 function preparePlateau(root: Object3D, lifetime: ChapterLifetime, wallLook: Texture, topLook: Texture) {
   root.name = 'env_plateau';
   lifetime.defer(bindInkMeshMaterials(root, (source, name) => {
@@ -124,7 +155,10 @@ function preparePlateau(root: Object3D, lifetime: ChapterLifetime, wallLook: Tex
       preset: top || name === 'plateau_steps' ? 'stone' : 'rock',
       ...(top ? { lineWeight: 0.4 } : {}), ...(wall || top ? { vertexPaint: true } : {}),
     });
-    if (wall || top) material.map = top ? topLook : wallLook;
+    if (wall || top) {
+      material.map = null;
+      material.colorNode = top ? plateauLookColor(topLook, plateauLookStyles.top) : plateauLookColor(wallLook, plateauLookStyles.wall);
+    }
     return material;
   }));
   root.traverse(node => {

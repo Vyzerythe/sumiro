@@ -27,28 +27,44 @@ try {
 } finally { $image.Dispose(); $source.Dispose() }
 `;
 
-function decode(bytes) {
+function runDecoder(executable, args, bytes) {
   return new Promise((accept, reject) => {
-    const command = Buffer.from(decoder, 'utf16le').toString('base64');
-    const process = spawn('pwsh', ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', command], { windowsHide: true });
+    const process = spawn(executable, args, { windowsHide: true });
     const output = [], errors = [];
     process.stdout.on('data', chunk => output.push(chunk));
     process.stderr.on('data', chunk => errors.push(chunk));
     process.stdin.on('error', reject);
     process.once('error', reject);
     process.once('close', code => {
-      if (code !== 0) { reject(Error('Windows image decode failed: ' + Buffer.concat(errors).toString('utf8'))); return; }
-      try {
-        const bytes = Buffer.concat(output);
-        const width = bytes.readUInt32LE(0), height = bytes.readUInt32LE(4);
-        const data = bytes.subarray(8);
-        if (data.length !== width * height * 4) throw Error('Windows image byte count disagrees with dimensions');
-        for (let index = 0; index < data.length; index += 4) [data[index], data[index + 2]] = [data[index + 2], data[index]];
-        accept({ width, height, data });
-      } catch (error) { reject(error); }
+      if (code !== 0) reject(Error(`${executable} image decode failed: ` + Buffer.concat(errors).toString('utf8')));
+      else accept(Buffer.concat(output));
     });
     process.stdin.end(bytes);
   });
+}
+
+async function decode(bytes) {
+  let width, height, data;
+  if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') {
+    const pam = await runDecoder('magick', ['-limit', 'thread', '1', 'webp:-', '-alpha', 'on', '-depth', '8', 'pam:-'], bytes);
+    const end = pam.indexOf('ENDHDR\n') + 'ENDHDR\n'.length;
+    const header = pam.toString('ascii', 0, end);
+    width = Number(/^WIDTH (\d+)$/m.exec(header)?.[1]);
+    height = Number(/^HEIGHT (\d+)$/m.exec(header)?.[1]);
+    if (!header.startsWith('P7\n') || !/^DEPTH 4$/m.test(header) || !/^MAXVAL 255$/m.test(header)) {
+      throw Error('WebP decoder did not produce eight-bit RGBA');
+    }
+    data = pam.subarray(end);
+  } else {
+    const command = Buffer.from(decoder, 'utf16le').toString('base64');
+    const pixels = await runDecoder('pwsh', ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', command], bytes);
+    width = pixels.readUInt32LE(0);
+    height = pixels.readUInt32LE(4);
+    data = pixels.subarray(8);
+    for (let index = 0; index < data.length; index += 4) [data[index], data[index + 2]] = [data[index + 2], data[index]];
+  }
+  if (width <= 0 || height <= 0 || data.length !== width * height * 4) throw Error('Image byte count disagrees with dimensions');
+  return { width, height, data };
 }
 
 /** Decode local textures and embedded GLB images without opening a browser. */

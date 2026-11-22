@@ -576,6 +576,11 @@ try {
   console.log('Chapter checkpoint WebGPU resume', JSON.stringify(position));
 
   const sceneRegistry = resumed.context.registry;
+  const gateRope = resumed.context.scene.getObjectByName('gate_rope');
+  const inkPoolMesh = resumed.context.scene.getObjectByName('ink_pool');
+  assert.ok(gateRope?.visible, 'a run without Ink Step must show the gate rope');
+  assert.ok(inkPoolMesh?.isMesh && inkPoolMesh.material.transparent);
+  const ropeHeight = gateRope.position.y;
   for (let step = 0; step < 180 && sceneRegistry.get('story.scene') !== 'opening_cat'; step++) resumed.step();
   assert.equal(sceneRegistry.get('story.scene'), 'opening_cat', JSON.stringify(sceneRegistry.get('player.position')));
   const beforeScene = sceneRegistry.get('player.position');
@@ -610,11 +615,16 @@ try {
   }
   storyInput.release();
   storyInput.tap('KeyE');
-  for (let step = 0; step < 420; step++) resumed.step();
+  for (let step = 0; step < 330 && !poolAndGate.some(event => event.phase === 'dropping'); step++) resumed.step();
+  assert.ok(poolAndGate.some(event => event.phase === 'dropping'));
+  for (let step = 0; step < 42; step++) resumed.step();
+  assert.ok(gateRope.visible && gateRope.position.y < ropeHeight - .3, 'the visible rope must fall during the authored gate phase');
+  for (let step = 0; step < 180; step++) resumed.step();
   listenPool();
   assert.equal(resumedRun.current.abilities.inkStep, true, JSON.stringify(sceneRegistry.get('player.position')));
   assert.equal(checkpoints.at(-1)[1].flags.inkStep, true);
   assert.deepEqual(poolAndGate.map(event => event.phase ?? event.type), ['pool-contact', 'dropping', 'open']);
+  assert.equal(gateRope.visible, false);
   storyInput.tap('ShiftLeft');
   assert.equal(sceneRegistry.get('player.position').state, 'DODGE');
   for (let step = 0; step < 40; step++) resumed.step();
@@ -702,6 +712,31 @@ try {
   device.pushErrorScope('validation');
   resumed.render();
   assert.equal(await device.popErrorScope(), null);
+  const playerNow = () => resumed.context.registry.get('player.position');
+  const vitalsNow = () => resumed.context.registry.get('game.vitals');
+  assert.equal(vitalsNow().strokes, 5);
+  for (let step = 0; step < 1200 && vitalsNow().strokes === 5; step++) {
+    steerToward(readDuel().enemy, playerNow(), 1.37);
+    resumed.step();
+  }
+  releaseArrows();
+  assert.equal(vitalsNow().strokes, 4, JSON.stringify(readDuel()));
+  assert.equal(readDuel().player.strokes, vitalsNow().strokes);
+  const retreat = { x: 9.6, z: -22 };
+  for (let step = 0; step < 180; step++) {
+    if (steerToward(retreat, playerNow(), .8) <= .8) break;
+    resumed.step();
+  }
+  releaseArrows();
+  for (let step = 0; step < 16; step++) resumed.step();
+  const wounded = vitalsNow().strokes;
+  key('KeyR');
+  assert.equal(vitalsNow().drinks, 2);
+  assert.equal(vitalsNow().strokes, wounded, 'drinking must wait for its animation cue to heal');
+  for (let step = 0; step < 68; step++) resumed.step();
+  assert.equal(vitalsNow().strokes, Math.min(5, wounded + 2));
+  console.log('Native Court vitals recovery', JSON.stringify({ wounded, healed: vitalsNow().strokes, drinks: vitalsNow().drinks }));
+  for (let step = 0; step < 45; step++) resumed.step();
   for (let step = 0; step < 1800 && readDuel().phase === 'fighting'; step++) {
     const { player, enemy } = readDuel();
     const position = resumed.context.registry.get('player.position');
@@ -821,6 +856,13 @@ try {
   keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyE' }));
   assert.equal(seaWrite.chapter, 'ch5_sea');
   assert.equal(seaWrite.shrine, 'first_rock');
+  const seaInput = keyboardDriver(seaResume);
+  seaInput.tap('KeyS', 24);
+  assert.notDeepEqual(seaResume.context.registry.get('player.position'), feet);
+  seaResume.setPaused(true);
+  seaResume.restartFromCheckpoint();
+  assert.deepEqual(seaResume.context.registry.get('player.position'), feet);
+  assert.equal(seaResume.context.paused, false);
   device.pushErrorScope('validation');
   seaResume.render();
   assert.equal(await device.popErrorScope(), null);
@@ -846,6 +888,30 @@ const pinesCombat = await createTraversalPreview({
 const pinesInput = keyboardDriver(pinesCombat);
 try {
   const { registry } = pinesCombat.context;
+  const pinesFeet = () => registry.get('player.position');
+  for (let step = 0; step < 180; step++) {
+    if (pinesInput.steer({ x: -11, z: -199.8 }, pinesFeet(), .45) <= .45) break;
+    pinesCombat.step();
+  }
+  pinesInput.release();
+  pinesInput.tap('KeyE');
+  assert.equal(registry.get('story.scene'), 'lantern_rest', JSON.stringify(pinesFeet()));
+  let restSpoken = false;
+  const stopRest = registry.on('story.subtitle', line => { restSpoken ||= line === 'Warm, is it? Rest a moment.'; });
+  for (let step = 0; step < 1900 && registry.get('story.scene'); step++) {
+    pinesCombat.step();
+    if (step % 300 !== 0) continue;
+    pendingFrame?.(performance.now());
+    device.pushErrorScope('validation');
+    pinesCombat.render();
+    assert.equal(await device.popErrorScope(), null);
+  }
+  stopRest();
+  assert.equal(registry.get('story.scene'), null, 'rest must release camera and player control');
+  assert.equal(restSpoken, true);
+  assert.equal(registry.get('companion.state').phase, 'CARRIED');
+  assert.equal(pinesProgress.current.seen.story_lantern, true);
+  console.log('Native Pines lantern rest', JSON.stringify({ feet: pinesFeet(), rested: pinesWrite.shrine, restSpoken }));
   const encounter = () => registry.get('combat.encounters');
   for (let step = 0; step < 180 && encounter()?.actors.length === 0; step++) {
     pinesInput.steer({ x: -16.2, z: -197.6 }, registry.get('player.position'), .35);

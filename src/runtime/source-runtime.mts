@@ -1,6 +1,7 @@
 import { PerspectiveCamera, type Camera, type Object3D, type Scene } from 'three/webgpu';
 import { createAssetManager, type AssetManager, type AssetManagerOptions } from '../assets/asset-manager.mts';
 import { createAudioMixer, type AudioMixer, type AudioMixerContext, type AudioMixerOptions, type AudioVolumes } from '../audio/audio-mixer.mts';
+import type { RunVitalsSnapshot } from '../domain/run-vitals.mts';
 import { createInputManager, type InputManager, type InputManagerOptions } from '../input/input-manager.mts';
 import { createWebGpuSurface } from '../rendering/webgpu-renderer.mts';
 import { FixedStepClock, SimulationTimeReader } from './fixed-step-clock.mts';
@@ -18,6 +19,7 @@ interface RuntimeValues extends Record<string, unknown> {
   'game.options': Partial<AudioVolumes>;
   'game.paused': boolean;
   'game.completed': boolean;
+  'game.vitals': RunVitalsSnapshot;
   'chapter.prompt': string | null;
   'audio.duck': boolean;
 }

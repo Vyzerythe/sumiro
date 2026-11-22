@@ -2,6 +2,7 @@ import type { AssetManager } from '../assets/asset-manager.mts';
 import { chapterCombat, createEncounterController, type EncounterTicket } from '../combat/encounters.mts';
 import { createSwordDuel, type SwordDuelEvent, type SwordDuelInput } from '../combat/sword-duel.mts';
 import type { createRunProgress } from '../domain/run-progress.mts';
+import type { StrokePool } from '../domain/run-vitals.mts';
 import type { CollisionWorld } from '../physics/world.mts';
 import type { createTraversalController } from '../player/traversal-controller.mts';
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
@@ -10,7 +11,7 @@ import { loadSwordWraithPresentation } from './sword-wraith-presentation.mts';
 export async function loadChapterTwoDuel(
   assets: AssetManager, lifetime: ChapterLifetime, world: CollisionWorld,
   player: ReturnType<typeof createTraversalController>, progress: ReturnType<typeof createRunProgress>, onEvent: (event: SwordDuelEvent) => void,
-  random?: () => number,
+  random?: () => number, health?: StrokePool,
 ) {
   const wraith = await loadSwordWraithPresentation(assets, lifetime);
   let ticket: EncounterTicket | undefined;
@@ -18,7 +19,7 @@ export async function loadChapterTwoDuel(
     onEvent(event) {
       if (event.type === 'encounter-clear' && ticket) encounter.defeat(ticket);
       onEvent(event);
-    }, ...(random ? { random } : {}) });
+    }, ...(random ? { random } : {}), ...(health ? { health } : {}) });
   const court = chapterCombat[2]?.encounters.find(item => item.id === 'sword_wraith');
   if (!court) throw Error('Chapter Two court encounter is missing');
   const encounter = createEncounterController([court], {

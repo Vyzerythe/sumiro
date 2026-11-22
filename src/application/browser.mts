@@ -4,6 +4,7 @@ import { createDefaultRun, saveKey } from '../domain/save.mts';
 import { createChapterPreview } from './chapter-preview.mts';
 import { createCredits } from './credits.mts';
 import { createCreditsView } from './credits-view.mts';
+import { createVitalsView } from './vitals-view.mts';
 import { createTraversalPreview } from './traversal-preview.mts';
 
 function element<Kind extends Element>(selector: string): Kind {
@@ -20,8 +21,10 @@ const continueButton = element<HTMLButtonElement>('#continue');
 const pauseButton = element<HTMLButtonElement>('#pause-button');
 const pauseMenu = element<HTMLElement>('#pause-menu');
 const resumeButton = element<HTMLButtonElement>('#resume');
+const restartButton = element<HTMLButtonElement>('#restart-checkpoint');
 const returnButton = element<HTMLButtonElement>('#return-to-title');
 const advanceCredits = element<HTMLButtonElement>('#advance-credits');
+const vitalsRoot = element<HTMLElement>('#vitals');
 
 function viewport(element: HTMLCanvasElement) {
   return {
@@ -47,6 +50,7 @@ const nativeStorage = createNativeSaveStorage(() => localStorage);
 const progressStorage = directPreview ? { getItem: nativeStorage.getItem } : nativeStorage;
 const readProgress = () => createRunProgress(progressStorage);
 const credits = createCreditsView(element<HTMLElement>('#credits'), advanceCredits, returnToTitle);
+const vitals = createVitalsView(vitalsRoot, assetBaseURL);
 
 function showTitle() {
   continueButton.disabled = !readProgress().hasSave;
@@ -69,12 +73,13 @@ function presentGame(current: Game, progress: ReturnType<typeof createRunProgres
   status.hidden = false;
   status.textContent = controls;
   pauseButton.hidden = false;
+  vitalsRoot.hidden = false;
   canvas.focus();
   function refreshStatus() {
-    status.textContent = sceneActive ? subtitle ?? 'Enter or Escape to skip' : prompt;
+    status.textContent = subtitle ?? (sceneActive ? 'Enter or Escape to skip' : prompt);
   }
   function showNotice(text: string, duration: number) {
-    if (sceneActive) return;
+    if (sceneActive || subtitle) return;
     window.clearTimeout(notice);
     status.textContent = text;
     notice = window.setTimeout(() => { notice = undefined; refreshStatus(); }, duration);
@@ -94,6 +99,8 @@ function presentGame(current: Game, progress: ReturnType<typeof createRunProgres
   const unpause = current.context.registry.on('game.paused', paused => {
     pauseMenu.hidden = !paused;
     pauseButton.hidden = paused || sceneActive;
+    vitalsRoot.hidden = paused || sceneActive;
+    status.hidden = paused;
     if (paused) resumeButton.focus();
     else canvas.focus();
   });
@@ -102,6 +109,7 @@ function presentGame(current: Game, progress: ReturnType<typeof createRunProgres
     window.clearTimeout(notice);
     notice = undefined;
     pauseButton.hidden = sceneActive || current.context.paused;
+    vitalsRoot.hidden = pauseButton.hidden;
     refreshStatus();
   });
   const sceneSubtitle = current.context.registry.on('story.subtitle', line => {
@@ -115,11 +123,12 @@ function presentGame(current: Game, progress: ReturnType<typeof createRunProgres
   });
   const completed = current.context.registry.on('game.completed', finished => {
     if (!finished) return;
-    pauseButton.hidden = pauseMenu.hidden = status.hidden = true;
+    vitalsRoot.hidden = pauseButton.hidden = pauseMenu.hidden = status.hidden = true;
     credits.show(createCredits(progress.current));
   });
+  const showVitals = current.context.registry.on('game.vitals', vitals.draw);
   stopInterface = () => {
-    unsubscribe(); unpause(); activeScene(); sceneSubtitle(); laterPrompt(); completed();
+    unsubscribe(); unpause(); activeScene(); sceneSubtitle(); laterPrompt(); completed(); showVitals();
     window.clearTimeout(notice);
     credits.reset();
   };
@@ -131,7 +140,7 @@ function closeSession() {
   runtime = game = undefined;
   stopInterface?.();
   stopInterface = undefined;
-  pauseButton.hidden = pauseMenu.hidden = status.hidden = true;
+  vitalsRoot.hidden = pauseButton.hidden = pauseMenu.hidden = status.hidden = true;
   closing = Promise.resolve().then(() => previous?.dispose()).finally(() => { closing = undefined; });
   return closing;
 }
@@ -198,6 +207,7 @@ startButton.addEventListener('click', () => {
 continueButton.addEventListener('click', () => { void launch('continue'); }, listen);
 pauseButton.addEventListener('click', () => game?.setPaused(true), listen);
 resumeButton.addEventListener('click', () => game?.setPaused(false), listen);
+restartButton.addEventListener('click', () => game?.restartFromCheckpoint(), listen);
 window.addEventListener('keydown', event => {
   if (event.code === 'Escape' && game?.context.paused && event.target !== canvas && !event.repeat) game.setPaused(false);
 }, listen);

@@ -7,6 +7,7 @@ import { createSwordPlayer } from '../combat/sword-player.mts';
 import type { SwordDuelInput } from '../combat/sword-duel.mts';
 import { chapters } from '../domain/chapters.mts';
 import type { createRunProgress } from '../domain/run-progress.mts';
+import type { StrokePool } from '../domain/run-vitals.mts';
 import type { CollisionWorld } from '../physics/world.mts';
 import type { AnimatedPlayer } from '../player/animated-player.mts';
 import type { createTraversalController } from '../player/traversal-controller.mts';
@@ -22,6 +23,7 @@ interface CombatOptions {
   root: Object3D;
   player: ReturnType<typeof createTraversalController>;
   progress: ReturnType<typeof createRunProgress>;
+  health: StrokePool;
   duration: AnimatedPlayer['duration'];
   random?: () => number;
   onCue(name: string): void;
@@ -38,7 +40,7 @@ interface ActiveActor {
 
 /** Own one player combat state, an authored wave controller, and the stage's opponents. */
 export async function loadEncounterCombat({
-  id, assets, lifetime, world, root, progress, player, duration, random, onCue, onHint,
+  id, assets, lifetime, world, root, progress, health, player, duration, random, onCue, onHint,
 }: CombatOptions) {
   const chapterNumber = chapters.findIndex(chapter => chapter.id === id) + 1;
   const definition = chapterCombat[chapterNumber as 1 | 2 | 3 | 4 | 5 | 6];
@@ -48,7 +50,7 @@ export async function loadEncounterCombat({
   const actors = new Map<string, ActiveActor>();
   const projectiles = createEncounterProjectiles(world, root);
   const sword = createSwordPlayer({
-    duration, move: player.moveCombat,
+    duration, health, move: player.moveCombat,
     targets: () => [
       ...[...actors.values()].map(({ enemy }) => ({ ...enemy.state, targetable: enemy.state.alive && enemy.state.awake })),
       ...swarms.map(swarm => ({ ...swarm.state, targetable: !swarm.state.broken && !swarm.state.gone })),
@@ -133,7 +135,7 @@ export async function loadEncounterCombat({
       for (const id of actors.keys()) release(id);
       for (const swarm of swarms) swarm.reset();
       projectiles.reset();
-      sword.reset(5 + Math.floor(progress.current.scrolls.length / 3) + (progress.current.options.assist === true ? 2 : 0));
+      sword.reset();
     },
     step(delta: number, seconds: number, input: SwordDuelInput, enabled: boolean) {
       if (delta <= 0) return;

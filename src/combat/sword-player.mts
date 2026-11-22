@@ -1,4 +1,5 @@
 import type { CollisionPosition } from '../physics/world.mts';
+import type { StrokePool } from '../domain/run-vitals.mts';
 import { canParrySwordBlow, swordCuts, type SwordDuelInput, type SwordDuelPlayer } from './sword-duel.mts';
 
 type Action = 'IDLE' | 'DRAW' | 'ATTACK' | 'PARRY' | 'HIT' | 'DEATH';
@@ -8,6 +9,7 @@ type Target = Readonly<CollisionPosition & { id: string; targetable: boolean }>;
 type Horizontal = Pick<CollisionPosition, 'x' | 'z'>;
 
 interface SwordPlayerEffects {
+  health?: StrokePool;
   targets(): readonly Target[];
   duration(clip: string): number;
   move(dx: number, dz: number, heading: number): SwordDuelPlayer;
@@ -22,8 +24,9 @@ const angle = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Mat
 
 /** One player action clock and health pool shared by every active encounter actor. */
 export function createSwordPlayer(effects: SwordPlayerEffects) {
+  let standaloneStrokes = 5;
   const state = { action: 'IDLE' as Action, clip: null as string | null, frame: 0, elapsed: 0,
-    heading: 0, combo: null as Combo | null, strokes: 5, swordOut: false };
+    heading: 0, combo: null as Combo | null, get strokes() { return effects.health?.strokes ?? standaloneStrokes; }, swordOut: false };
   let queued: 'attack' | 'parry' | undefined;
   let target: Target | undefined;
   let speed = 1;
@@ -140,13 +143,14 @@ export function createSwordPlayer(effects: SwordPlayerEffects) {
         effects.cue('parry');
         return 'parried';
       }
-      state.strokes = Math.max(0, state.strokes - damage);
+      const strokes = effects.health ? effects.health.hurt(damage) : (standaloneStrokes = Math.max(0, standaloneStrokes - damage));
       invulnerable = 0.75;
-      select(state.strokes === 0 ? 'DEATH' : 'HIT', state.strokes === 0 ? 'death' : 'hit', 1.15);
+      select(strokes === 0 ? 'DEATH' : 'HIT', strokes === 0 ? 'death' : 'hit', 1.15);
       return 'hit';
     },
     reset(strokes = 5) {
-      Object.assign(state, { strokes, swordOut: false });
+      standaloneStrokes = strokes;
+      state.swordOut = false;
       queued = target = undefined;
       attackBuffer = parryBuffer = riposte = invulnerable = 0;
       select('IDLE', null);
