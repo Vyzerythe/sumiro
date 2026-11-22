@@ -3,13 +3,14 @@ import type { CapsuleHit, CollisionWorld } from '../physics/world.mts';
 import { createClimbingController, type ClimbingState, type TraversalLedgeDefinition, type TraversalLeapDefinition } from './climbing-controller.mts';
 import { updateInputSteering, type SteeringState } from './input-steering.mts';
 import { beginFall, beginJump, classifyGroundGait, type JumpState } from './locomotion.mts';
+import { beginLowMantle, probeLowMantle, probeWallMantle, updateLowMantle, type LowMantleState, type MantleDestination } from './mantle.mts';
 import {
   finishLanding, stepAirborne, stepGroundContact, type AirborneState,
   type GroundContactState, type GroundContactEffects, type LandingState,
 } from './motion-physics.mts';
 import { movementConfig as tuning } from './movement-config.mts';
 
-type TraversalState = GroundContactState & SteeringState & AirborneState & LandingState & JumpState & ClimbingState & {
+type TraversalState = GroundContactState & SteeringState & AirborneState & LandingState & JumpState & ClimbingState & LowMantleState & {
   jumpClip: 'jump_up' | 'jump_fwd';
 };
 
@@ -41,7 +42,7 @@ export function createTraversalController(
     fade: 0, dissolve: 0, rootY: ground.y, airDashed: false, landHeavy: false,
     braking: false, recentSpeed: 0, jumpClip: 'jump_up',
     ledge: null, ledgeS: 0, shimmyHold: null, hangForward: 0, hangBack: 0, hangBackFresh: false,
-    leap: null, gestureClip: null, gestureSpeed: 1,
+    leap: null, mantle: null, gestureClip: null, gestureSpeed: 1,
   };
   const initial = { ...state };
   let inkCooldown = 0;
@@ -126,11 +127,29 @@ export function createTraversalController(
     duration: options.duration, changeState, fall, land,
   });
 
+  function enterMantle(destination: MantleDestination) {
+    state.jumpBuf = 0;
+    beginLowMantle(state, destination, 0.38, (clip, { speed }) => {
+      state.gestureClip = clip;
+      state.gestureSpeed = speed;
+    }, changeState);
+  }
+
+  const mantleAnimation = {
+    key: () => state.stateT * state.gestureSpeed * 24,
+    finished: () => state.stateT * state.gestureSpeed >= (options?.duration('mantle_low') ?? 20 / 24),
+    gait: { idleT: 0 },
+    playGait() { state.gestureClip = null; },
+  };
+
   const airborne = {
     ...effects, guardedCapsule: bodyCapsule, normalCapsule: { ...bodyCapsule, guards: false },
     jumpHeld: false, groundTolerance: 0.35, changeState,
     land,
     ...(climbing ? { grabLedge: climbing.grabNearby } : {}),
+    tryWallMantle: () => probeWallMantle(state, effects.collision, world, enterMantle),
+    probeMantle: () => probeLowMantle(state, world),
+    beginMantle: enterMantle,
   };
 
   function beginInkStep() {
@@ -203,24 +222,53 @@ export function createTraversalController(
 
   return {
     state: state as Readonly<TraversalState>,
+    moveCombat(dx: number, dz: number, heading: number) {
+      if (!state.grounded || ![dx, dz, heading].every(Number.isFinite)) return state;
+      const contact = world.sweepCapsule(state, dx, dz, bodyCapsule, effects.collision);
+      const floor = visit(contact.x, contact.z);
+      if (floor) {
+        state.x = contact.x;
+        state.z = contact.z;
+        state.y = floor.y;
+        state.rootY = floor.y;
+        state.lastGroundY = floor.y;
+        state.surface = floor.surface;
+        state.carrier = floor.body;
+      }
+      state.heading = heading;
+      return state;
+    },
     reset() { Object.assign(state, initial); inkCooldown = 0; burst = null; },
     step(delta: number, input: TraversalInput, view: View) {
       if (!Number.isFinite(delta) || delta < 0) throw RangeError('Traversal step must be nonnegative and finite');
       if (delta === 0) return state.grounded;
-      if (state.grounded && state.carrier?.enabled) {
-        const before = state.y;
+      if ((state.grounded || state.mantle) && state.carrier?.enabled) {
+        const { x, y, z } = state;
         state.carrier.carry(state);
-        state.rootY += state.y - before;
+        state.rootY += state.y - y;
         state.heading = wrapAngle(state.heading + state.carrier.dyaw);
+        if (state.mantle) {
+          state.mantle.x0 += state.x - x;
+          state.mantle.ax += state.x - x;
+          state.mantle.y0 += state.y - y;
+          state.mantle.z0 += state.z - z;
+          state.mantle.az += state.z - z;
+        }
       }
       state.stateT += delta;
       inkCooldown = Math.max(0, inkCooldown - delta);
       state.jumpBuf = Math.max(0, state.jumpBuf - delta);
       updateInputSteering(state, input, view, null, delta, tuning.buffer, 1.6);
+      if (state.mantle) {
+        updateLowMantle(state, mantleAnimation, world, 0.7, 2.1, effects.surfaceName, changeState, fall);
+        return state.grounded;
+      }
       if (climbing?.update(delta, input, view?.railYaw)) return state.grounded;
       if (input.inkStep && !burst && inkCooldown === 0 && (state.grounded || !state.airDashed) && options?.canInkStep?.()) beginInkStep();
       if (burst) { stepInk(delta, burst); return state.grounded; }
       if (state.jumpBuf > 0 && (state.grounded || state.coyote > 0)) {
+        const mantle = state.grounded ? probeLowMantle(state, world, state.stickMag > 0.1 ? 1 : 0.75) : null;
+        if (mantle) { enterMantle(mantle); return false; }
         if (state.grounded && climbing?.tryGroundLeap()) return false;
         jump();
       }

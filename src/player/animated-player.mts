@@ -14,13 +14,14 @@ export type AnimatedPlayerState = Pick<TraversalState,
 const PLAYER_MODEL = 'player/player.glb';
 const GAIT_CLIPS = ['stand_idle', 'walk', 'jog', 'run', 'sprint'] as const;
 const ACTION_CLIPS = ['jump_up', 'jump_fwd', 'fall', 'land', 'land_heavy'] as const;
-const GESTURE_CLIPS = ['jump_windup', 'leap_generic', 'wall_leap', 'hang_idle', 'climb_up', 'dodge', 'ink_step'] as const;
+const GESTURE_CLIPS = ['jump_windup', 'leap_generic', 'wall_leap', 'hang_idle', 'climb_up', 'mantle_low', 'dodge', 'ink_step'] as const;
+const COMBAT_CLIPS = ['idle_sword', 'run_sword', 'draw', 'attack_1', 'attack_2', 'attack_3', 'parry', 'parry_riposte', 'hit', 'death', 'rise'] as const;
 type GaitClip = (typeof GAIT_CLIPS)[number];
 type ActionClip = (typeof ACTION_CLIPS)[number] | (typeof GESTURE_CLIPS)[number];
-type PlayerClip = GaitClip | ActionClip;
+type PlayerClip = GaitClip | ActionClip | (typeof COMBAT_CLIPS)[number];
 
 interface Layer {
-  clip: ActionClip | 'gait';
+  clip: PlayerClip | 'gait';
   time: number;
   speed: number;
   weight: number;
@@ -32,7 +33,7 @@ export interface AnimatedPlayer {
   readonly root: Group;
   readonly mixer: AnimationMixer;
   duration(name: string): number;
-  update(state: AnimatedPlayerState, delta: number): void;
+  update(state: AnimatedPlayerState, delta: number, action?: { clip: string; frame: number }): void;
   reset(state?: AnimatedPlayerState): void;
   dispose(): void;
 }
@@ -66,7 +67,7 @@ export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
     root.rotation.order = 'YXZ';
     root.traverse(object => { if (object instanceof Mesh) object.frustumCulled = false; });
     playerMixer = new AnimationMixer(root);
-    for (const name of [...GAIT_CLIPS, ...ACTION_CLIPS, ...GESTURE_CLIPS]) {
+    for (const name of [...GAIT_CLIPS, ...ACTION_CLIPS, ...GESTURE_CLIPS, ...COMBAT_CLIPS]) {
       const clip = clips.get(name);
       if (!clip) continue;
       const action = playerMixer.clipAction(clip).play();
@@ -104,7 +105,7 @@ export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
   function chooseAnimation(state: AnimatedPlayerState, speed: number, snap: boolean) {
     const entered = previousState !== state.state || state.stateT < previousStateTime;
     const gesture = GESTURE_CLIPS.find(clip => clip === state.gestureClip);
-    const activeGesture = gesture && ['GRAB', 'HANG', 'SHIMMY', 'CLIMB', 'LEAP', 'DODGE', 'DASH'].includes(state.state);
+    const activeGesture = gesture && ['GRAB', 'HANG', 'SHIMMY', 'CLIMB', 'MANTLE_LOW', 'LEAP', 'DODGE', 'DASH'].includes(state.state);
     if (activeGesture && actions.has(gesture)) {
       play(gesture, snap ? 0 : 0.12, state.gestureSpeed ?? 1);
     } else if (!state.grounded) {
@@ -183,11 +184,16 @@ export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
     mixer.update(0);
   }
 
-  function update(state: AnimatedPlayerState, delta: number, snap = false) {
+  function update(state: AnimatedPlayerState, delta: number, action?: { clip: string; frame: number }, snap = false) {
     if (disposed) return;
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Animation step must be nonnegative and finite');
     const speed = Math.hypot(state.vx, state.vz);
-    chooseAnimation(state, speed, snap);
+    const explicitClip = action?.clip as PlayerClip | undefined;
+    if (action && explicitClip && actions.has(explicitClip) && Number.isFinite(action.frame)) {
+      play(explicitClip, snap ? 0 : 0.12);
+      const layer = layers.at(-1);
+      if (layer) layer.time = Math.max(0, action.frame / 24) - delta * layer.speed;
+    } else chooseAnimation(state, speed, snap);
     sampleAnimation(speed, delta);
     root.position.set(state.x, state.y, state.z);
     root.rotation.y = state.heading + Math.PI;
@@ -198,7 +204,7 @@ export function createAnimatedPlayer(model: GLTF): AnimatedPlayer {
     layers = [];
     gaitSpeed = phase = idleTime = previousStateTime = previousSpeed = 0;
     previousState = wasGrounded = undefined;
-    if (state) update(state, 0, true);
+    if (state) update(state, 0, undefined, true);
     else {
       play('gait', 0);
       sampleAnimation(0, 0);

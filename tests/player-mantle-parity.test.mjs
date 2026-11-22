@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
+import { createCollisionWorld } from '../src/physics/world.mts';
+import { createTraversalController } from '../src/player/traversal-controller.mts';
 import {
   probeLowMantle, probeWallMantle, beginLowMantle, updateLowMantle,
 } from '../src/player/mantle.mts';
@@ -139,4 +141,19 @@ test('mantle clip movement and final ground/fall decisions match published imple
       assert.deepEqual(ya.gait,yb.gait);
       assert.deepEqual(a.events,b.events);
     }
+});
+
+test('native Space input mounts a real wall and returns to supported ground', () => {
+  const world = createCollisionWorld();
+  world.addTriangles([-2, 0, 2, 2, 0, 2, 2, 0, -0.65, -2, 0, 2, 2, 0, -0.65, -2, 0, -0.65]);
+  world.addTriangles([-2, 0.9, -0.65, 2, 0.9, -0.65, 2, 0.9, -2, -2, 0.9, -0.65, 2, 0.9, -2, -2, 0.9, -2]);
+  world.addTriangles([-2, 0, -0.65, 2, 0, -0.65, 2, 0.9, -0.65, -2, 0, -0.65, 2, 0.9, -0.65, -2, 0.9, -0.65], { kind: 2 });
+  const player = createTraversalController(world, { x: 0, z: 0, heading: 0 });
+  const input = { forward: 0, strafe: 0, walk: false, sprint: false, jump: false, jumpHeld: false, inkStep: false };
+  player.step(1 / 60, { ...input, jump: true, jumpHeld: true }, null);
+  assert.equal(player.state.state, 'MANTLE_LOW');
+  for (let frame = 0; frame < 46 && !player.state.grounded; frame++) player.step(1 / 60, input, null);
+  assert.equal(player.state.state, 'IDLE');
+  assert.equal(player.state.grounded, true);
+  assert.ok(Math.abs(player.state.y - 0.9) < 1e-9 && player.state.z < -0.95);
 });

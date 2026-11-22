@@ -29,7 +29,7 @@ try {
   const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
   const traversal = walk
     ? await createTraversalPreview({ ...options, ...(progress ? { progress } : {}),
-      input: { keyboardTarget: window, getGamepads: () => navigator.getGamepads() },
+      input: { keyboardTarget: window, pointerTarget: canvas, blurTarget: window, getGamepads: () => navigator.getGamepads() },
       audio: { createContext: () => new AudioContext(), gestureTarget: window, visibilityTarget: document } })
     : null;
   const chapter = query.get('chapter');

@@ -17,6 +17,8 @@ import { chapterOneLedges, chapterOneLeapLinks } from './chapter-one-ledges.mts'
 import { chapterOneGateBarrier } from './chapter-one-obstacles.mts';
 import { loadChapterOneTraversalScene } from './chapter-one-scene.mts';
 import { createChapterTwoMechanisms } from './chapter-two-mechanisms.mts';
+import { loadChapterTwoDuel } from './chapter-two-duel.mts';
+import { createChapterTwoTraversal } from './chapter-two-ledges.mts';
 import { bindChapterTwoPresentation } from './chapter-two-presentation.mts';
 import { getStaticChapter } from './static-chapter-catalog.mts';
 import { createStaticTraversalCamera } from './static-traversal-camera.mts';
@@ -25,6 +27,7 @@ type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 interface TraversalPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'audio' | 'gpu' | 'input' | 'viewport'> {
   canvas: HTMLCanvasElement | OffscreenCanvas;
   progress?: ReturnType<typeof createRunProgress>;
+  random?: () => number;
 }
 
 interface TraversalChapter {
@@ -32,6 +35,7 @@ interface TraversalChapter {
   view: ReturnType<typeof createChapterOneCamera> | ReturnType<typeof createStaticTraversalCamera>;
   story?: ReturnType<typeof createChapterOneInteractions>;
   mechanisms?: { driver: ReturnType<typeof createChapterTwoMechanisms>; present(): void };
+  duel?: Awaited<ReturnType<typeof loadChapterTwoDuel>>;
   killDrop: number;
   killY?: number;
 }
@@ -39,7 +43,7 @@ interface TraversalChapter {
 type TraversalChapters = ChapterManager<Object3D, TraversalChapter>;
 
 /** Native traversal with independently prepared chapter roots and persistent player presentation. */
-export async function createTraversalPreview({ canvas, progress = createRunProgress({ getItem: () => null }),
+export async function createTraversalPreview({ canvas, progress = createRunProgress({ getItem: () => null }), random,
   ...options }: TraversalPreviewOptions) {
   const resumeState = progress.hasSave ? progress.current : undefined;
   const initialChapter = resumeState?.chapter ?? firstChapterId;
@@ -77,6 +81,8 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
       current.data.story?.enter(progress.current);
       current.data.mechanisms?.driver.enter(progress.current);
       current.data.mechanisms?.present();
+      current.data.duel?.driver.reset({ cleared: Boolean(progress.current.flags.ch2_sword_wraith) });
+      current.data.duel?.present(0);
       chapterTwoExitSeconds = 0;
       if (!current.data.story) context.registry.set('chapter.interaction', { type: 'prompt', target: null });
       context.registry.set('chapter.current', current.id);
@@ -172,9 +178,27 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                 resources.defer(() => driver.dispose());
                 mechanisms = { driver, present: bindChapterTwoPresentation(root, driver) };
               }
-              const player = createTraversalController(world, spawn, { ledges: [], leapLinks: [], duration: actor.duration, canInkStep });
+              const traversal = id === 'ch2_pass' ? createChapterTwoTraversal() : { ledges: [], leapLinks: [] };
+              const player = createTraversalController(world, spawn, { ...traversal, duration: actor.duration, canInkStep });
+              let duel: TraversalChapter['duel'];
+              if (id === 'ch2_pass') {
+                duel = await loadChapterTwoDuel(context.assets, resources, world, player, event => {
+                  context.registry.set('chapter.combat', event);
+                  if (event.type === 'encounter-clear') {
+                    progress.setFlag(event.flag);
+                    context.registry.set('chapter.interaction', {
+                      type: 'hint', text: 'The door has a bell beside it. The sword rings it.', ms: 5000,
+                    } satisfies ChapterOneInteractionEvent);
+                  } else if (event.type === 'encounter-start') {
+                    context.registry.set('chapter.interaction', {
+                      type: 'hint', text: 'J or left mouse to strike · K or right mouse to parry', ms: 5000,
+                    } satisfies ChapterOneInteractionEvent);
+                  } else if (event.type === 'cue' && event.name === 'gate') void audioCues?.play('gate');
+                }, random);
+                root.add(duel.root);
+              }
               return { root, data: { player, view: createStaticTraversalCamera(world, id), killDrop, killY,
-                ...(mechanisms ? { mechanisms } : {}) } };
+                ...(mechanisms ? { mechanisms } : {}), ...(duel ? { duel } : {}) } };
             },
           });
           const manager = chapters;
@@ -185,24 +209,36 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
           void audioCues?.update();
           const current = synchronize(context);
           if (!current || !visual) return;
-          const { player, story, mechanisms, killDrop, killY = -Infinity } = current.data;
+          const { player, story, mechanisms, duel, killDrop, killY = -Infinity } = current.data;
           if (mechanisms) {
             const { driver, present } = mechanisms;
             if (context.input.attack && player.state.grounded) {
               const bell = driver.bells.find(bell => Math.abs(bell.y - player.state.y) < 2.1 &&
                 Math.hypot(bell.x - player.state.x, bell.z - player.state.z) <= bell.radius + 0.6);
-              if (bell) driver.ringBell(bell.id);
+              if (bell) driver.ringBell(bell.id, { fighting: duel?.driver.phase === 'fighting' });
             }
             driver.step(delta, player.state);
             present();
           }
-          player.step(delta, context.input, steering);
-          if (player.state.lastGroundY - player.state.y > killDrop || player.state.y < killY) {
+          const combatAction = duel?.driver.player.action;
+          if (!combatAction || combatAction === 'IDLE') player.step(delta, context.input, steering);
+          duel?.driver.step(delta, player.state, {
+            attack: context.input.attack, parry: context.input.parry, swordAvailable: progress.current.abilities.sword === true,
+          });
+          duel?.present(delta);
+          if (duel) context.registry.set('combat.sword-wraith', {
+            phase: duel.driver.phase, enemy: { ...duel.driver.enemy }, player: { ...duel.driver.player },
+          });
+          const defeated = duel?.driver.phase === 'defeated' && duel.driver.player.elapsed > 2.1;
+          if (defeated || player.state.lastGroundY - player.state.y > killDrop || player.state.y < killY) {
             player.reset();
+            duel?.driver.reset({ cleared: Boolean(progress.current.flags.ch2_sword_wraith) });
             teleport++;
             visual.reset(player.state);
           }
-          visual.update(player.state, delta);
+          const action = duel?.driver.player;
+          visual.update(action?.clip ? { ...player.state, heading: action.heading } : player.state, delta,
+            action?.clip ? { clip: action.clip, frame: action.frame } : undefined);
           progress.tick(delta);
           story?.update(delta, player.state, { interact: context.input.interact });
           if (current.id === 'ch2_pass') {

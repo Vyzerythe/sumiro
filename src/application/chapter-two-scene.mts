@@ -1,13 +1,15 @@
 import { Group } from 'three/webgpu';
 import type { AssetManager } from '../assets/asset-manager.mts';
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
+import { createChapterTwoInkMaterial } from './chapter-two-materials.mts';
 import { chapterTwoSceneAssets } from './chapter-two-world.mts';
 import { loadInkSceneAsset } from './ink-scene-asset.mts';
 
 /** Load the supplied static pass and court. Animated mechanisms have separate owners. */
 export async function loadChapterTwoScene(assets: AssetManager, lifetime: ChapterLifetime) {
-  const paths = [chapterTwoSceneAssets.pass, chapterTwoSceneAssets.court] as const;
-  const [pass, court] = await Promise.all(paths.map(path => loadInkSceneAsset(assets, path, lifetime)));
+  const [pass, court] = await Promise.all((['pass', 'court'] as const).map(part =>
+    loadInkSceneAsset(assets, chapterTwoSceneAssets[part], lifetime,
+      (material, meshName) => createChapterTwoInkMaterial(material, part, meshName))));
   lifetime.signal.throwIfAborted();
   if (!pass || !court) throw Error('Chapter Two requires both the pass and the court');
   pass.traverse(object => { if (object.name.startsWith('crumble')) object.visible = false; });

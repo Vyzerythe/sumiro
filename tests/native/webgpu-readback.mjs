@@ -459,6 +459,7 @@ const resumed = await createTraversalPreview({
   } },
   progress: resumedRun,
   input: { keyboardTarget },
+  random: () => 0.3,
   gpu: nativeGpu,
 });
 try {
@@ -508,6 +509,8 @@ try {
   assert.equal(resumed.context.registry.get('chapter.current'), 'ch2_pass');
   const chapterTwoPixel = await sample(48, 58);
   assert.equal(chapterTwoPixel[3], 255);
+  assert.ok(chapterTwoPixel[0] > 100 && chapterTwoPixel[0] - chapterTwoPixel[1] < 35,
+    'authoring paint must not appear as saturated red on the Chapter Two terrain');
   const chapterSamples = [[20, 58], [35, 48], [48, 58], [63, 48], [75, 58]];
   const passPixels = await Promise.all(chapterSamples.map(([x, y]) => sample(x, y)));
   nextRoot.visible = false;
@@ -531,6 +534,52 @@ try {
   keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
   for (let step = 0; step < 235 && resumed.context.registry.get('player.position').z > -35.4; step++) resumed.step();
   keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyW' }));
+  const held = new Set();
+  function steerToward(target, position, stopRadius) {
+    const dx = target.x - position.x, dz = target.z - position.z;
+    const distance = Math.hypot(dx, dz);
+    const desired = new Set();
+    if (distance > stopRadius) {
+      if (Math.abs(dx) > Math.abs(dz) * 0.4) desired.add(dx > 0 ? 'KeyD' : 'KeyA');
+      if (Math.abs(dz) > Math.abs(dx) * 0.4) desired.add(dz < 0 ? 'KeyW' : 'KeyS');
+    }
+    for (const code of held) if (!desired.has(code)) {
+      keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code }));
+      held.delete(code);
+    }
+    for (const code of desired) if (!held.has(code)) {
+      keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: false }));
+      held.add(code);
+    }
+    return distance;
+  }
+
+  const readDuel = () => resumed.context.registry.get('combat.sword-wraith');
+  assert.equal(readDuel().phase, 'fighting');
+  assert.equal(nextRoot.getObjectByName('sword_wraith').visible, true);
+  pendingFrame(performance.now());
+  device.pushErrorScope('validation');
+  resumed.render();
+  assert.equal(await device.popErrorScope(), null);
+  for (let step = 0; step < 1800 && readDuel().phase === 'fighting'; step++) {
+    const { player, enemy } = readDuel();
+    const position = resumed.context.registry.get('player.position');
+    const distance = steerToward(enemy, position, 1.9);
+    if (enemy.hitIn != null && enemy.hitIn > 0.07 && enemy.hitIn < 0.15 && player.action !== 'PARRY') key('KeyK', 1);
+    else if (step % 6 === 0 && distance < 2.8 && enemy.action !== 'RISING') key('KeyJ', 1);
+    else resumed.step();
+  }
+  assert.equal(readDuel().phase, 'clear', JSON.stringify(readDuel()));
+  assert.equal(resumedRun.current.flags.ch2_sword_wraith, true);
+  console.log('Native sword-wraith session', JSON.stringify({ phase: readDuel().phase, hp: readDuel().enemy.hp,
+    strokes: readDuel().player.strokes, storedFlag: checkpoints.at(-1)[1].flags.ch2_sword_wraith }));
+
+  const bell = { x: 17.4, z: -36.4 };
+  for (let step = 0; step < 210; step++) {
+    if (steerToward(bell, resumed.context.registry.get('player.position'), 1.2) <= 1.2) break;
+    resumed.step();
+  }
+  steerToward(bell, bell, 0);
   key('KeyJ', 1);
   assert.equal(resumedRun.current.flags.ch2_court_door, true, 'an attack near the bell must open the court');
   for (let step = 0; step < 55; step++) resumed.step();
