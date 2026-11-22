@@ -76,7 +76,11 @@ The development build compiles the moving-triangle body factory from `src/physic
 
 ### Source-backed collision world
 
-The isolated development build now redirects the collision world's entire public factory to `src/physics/world.mjs`. This includes grid indexing, group filtering, height queries, ray casts, capsule sweeps, disc contacts, and moving-body registration. The parity tests (`tests/world-parity.test.mjs`) execute both implementations on fixed geometry, dynamic bodies, and seeded random queries. The resulting game build must also pass the Chromium title-screen smoke test; this still does not establish full gameplay or frame-by-frame movement equivalence.
+The isolated development build redirects the collision world factory to `src/physics/world.mts`. The typed interface covers grid indexing, group filtering, height queries, ray casts, capsule sweeps, disc contacts, and moving-body registration. The parity tests (`tests/world-parity.test.mjs`) execute both implementations on fixed geometry, dynamic bodies, and seeded random queries.
+
+### Chapter transitions and HUD timing
+
+The copied game delegates transition sequencing to `src/domain/scene-transition.mts`. The copied HUD delegates wash, reveal, and chapter-card timing to `src/runtime/hud-timeline.mts`. Tests compare the transition order and timing against the published functions and exercise failure recovery and teardown. The development build still requires a live chapter-transition check.
 
 ### Player cinematic timing
 

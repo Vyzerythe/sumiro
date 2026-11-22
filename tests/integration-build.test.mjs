@@ -17,10 +17,11 @@ const trail = 'sumiro/bundle/trail-BFIL-IHB.js';
 const renderer = 'sumiro/bundle/render_pipeline-BTCk4Dyc.js';
 const sight = 'sumiro/bundle/sight-DXR0ElmN.js';
 const entry = 'sumiro/bundle/index-DnHRwVtn.js';
+const hud = 'sumiro/bundle/hud-D8uImnxA.js';
 
 test('source-backed build preserves originals and binds live domain imports', async () => {
   const hash = data => createHash('sha256').update(data).digest('hex');
-  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer, sight, entry];
+  const publishedChunks = [game, chapters, kit, collision, player, trail, renderer, sight, entry, hud];
   const before = await Promise.all(publishedChunks.map(p => readFile(join(root,p))));
   try {
     const result = spawnSync(process.execPath, ['scripts/build-reconstructed-dev.mjs', '--out', out], {
@@ -41,6 +42,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     ]);
     assert.match(outputGame, /from'\.\.\/\.\.\/src\/domain\/save\.mjs'/);
     assert.doesNotMatch(outputGame, /function te\(/);
+    assert.match(outputGame, /runSceneTransition\(state,/);
+    assert.match(outputGame, /transitionSignal:lifetime\?\.signal/);
+    const outputHud = await readFile(join(out, hud), 'utf8');
+    assert.match(outputHud, /p\.timeline\.advance\(e\)/);
+    assert.match(outputHud, /p\.timeline\.dispose\(\)/);
     assert.match(outputChapters, /src\/domain\/chapters\.mjs/);
     assert.match(outputKit, /src\/domain\/scrolls\.mjs/);
     assert.match(outputCollision, /src\/physics\/geometry\.mjs/);
@@ -195,7 +201,7 @@ test('source-backed build preserves originals and binds live domain imports', as
     host.update(0);
     assert.equal(updated, true);
     host.dispose();
-    for (const path of [renderer, entry]) {
+    for (const path of [game, hud, renderer, entry]) {
       const syntax = spawnSync(process.execPath, ['--check', join(out, path)], { encoding: 'utf8' });
       assert.equal(syntax.status, 0, syntax.stderr);
     }

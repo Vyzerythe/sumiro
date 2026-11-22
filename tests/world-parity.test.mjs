@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createCollisionWorld } from '../src/physics/world.mjs';
+import { createCollisionWorld } from '../src/physics/world.mts';
 import { t as createPublishedWorld } from '../sumiro/bundle/collision-DtBQEpmQ.js';
 
 const triangles = [
@@ -102,6 +102,35 @@ test('capsule sweeps preserve contacts, discs, guards, and moving triangle behav
     const a=original.sweepCapsule({...position},dx,dz,settings,{});
     const b=candidate.sweepCapsule({...position},dx,dz,settings,{});
     assert.deepEqual(contact(b),contact(a),'sweep '+JSON.stringify([position,dx,dz,settings]));
+  }
+});
+
+test('ground hits are borrowed while capsule sweeps fill caller-owned output', () => {
+  const original = makeWorld(createPublishedWorld);
+  const candidate = makeWorld(createCollisionWorld);
+  for (const world of [candidate, original]) {
+    const ground = world.groundAt(1, 1);
+    const floor = normalize(ground);
+    assert.equal(floor.surface, 'floor');
+    assert.equal(world.groundAt(100, 100), null);
+    assert.deepEqual(normalize(ground), floor, 'a miss does not clear a borrowed hit');
+    assert.strictEqual(world.groundAt(-3, -4), ground);
+    assert.strictEqual(ground.body, world.body('platform'));
+    assert.equal(ground.surface, 'platform');
+
+    const output = { tag: Symbol(), kind: 'pending' };
+    const disc = { x: 3, y: 0, z: 3 };
+    assert.strictEqual(world.sweepCapsule(disc, 1, 0, undefined, output), output);
+    assert.equal(output.hit, true);
+    assert.equal(output.round, true);
+    const tag = output.tag;
+    assert.strictEqual(world.sweepCapsule({ x: Infinity, y: 1, z: 7 }, 2, 0, undefined, output), output);
+    assert.strictEqual(output.tag, tag);
+    assert.deepEqual(contact(output), {
+      x: Infinity, z: 7, hit: false, solid: false, depth: 0, kind: 0, nx: 0, nz: 0,
+      group: null, round: false, body: null,
+    });
+    assert.notStrictEqual(world.sweepCapsule(disc, 1, 0), world.sweepCapsule(disc, 1, 0));
   }
 });
 

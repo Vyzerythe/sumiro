@@ -4,7 +4,7 @@ import * as reference from '../sumiro/bundle/trail-BFIL-IHB.js';
 import {
   createMovementTrail, findWalkableSegment, trailCapsule, trailHeightTolerance, trailGroundAt,
 } from '../src/player/movement-trail.mts';
-import { createCollisionWorld } from '../src/physics/world.mjs';
+import { createCollisionWorld } from '../src/physics/world.mts';
 
 function worldWithFloor() {
   const world = createCollisionWorld();

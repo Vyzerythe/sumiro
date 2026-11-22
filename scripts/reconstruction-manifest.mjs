@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 export const bundleAdapters = {
   game: {
     file: 'bundle/game-B5zfa1fm.js', gitBlob: '284349f2f8d0235e163f3c9b88b17ed222e3b269',
-    status: 'hybrid', sourceModules: ['src/domain/save.mts'],
+    status: 'hybrid', sourceModules: ['src/domain/save.mts', 'src/domain/scene-transition.mts'],
   },
   chapters: {
     file: 'bundle/chapters-B8aGs4KP.js', gitBlob: '3da4e0f31fed783d0e548dd40fd0c1113cca16ec',
@@ -17,7 +17,7 @@ export const bundleAdapters = {
   collision: {
     file: 'bundle/collision-DtBQEpmQ.js', gitBlob: 'bb06154a9be5a24421a017f4c84adf7c87064d1b',
     status: 'source',
-    sourceModules: ['src/physics/geometry.mts', 'src/physics/moving-body.mts', 'src/physics/world.mjs'],
+    sourceModules: ['src/physics/geometry.mts', 'src/physics/moving-body.mts', 'src/physics/world.mts'],
   },
   player: {
     file: 'bundle/player-1_KrBWnI.js', gitBlob: '2ba1dbb18011510e025d5f3af06b045f143a3d10',
@@ -34,6 +34,10 @@ export const bundleAdapters = {
       'src/player/motion-physics.mjs',
       'src/player/movement-config.mjs',
     ],
+  },
+  hud: {
+    file: 'bundle/hud-D8uImnxA.js', gitBlob: 'd1fee95d80a07bed241dc8a2c60fe345f73d38f0',
+    status: 'hybrid', sourceModules: ['src/runtime/hud-timeline.mts'],
   },
   trail: {
     file: 'bundle/trail-BFIL-IHB.js', gitBlob: '950ee6272e85d1c446a2de97ce0df4930c6d3145',

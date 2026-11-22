@@ -45,8 +45,35 @@ const saveImports = [
   'isSupportedSave as te', 'normalizeSaveChapters as h',
   'loadSave as g', 'writeSave as _',
 ].join(',');
+const transitionBegin = gameText.indexOf('async function z(e,t,{card:');
+const transitionEnd = gameText.indexOf('function B(e,t)', transitionBegin);
+if (transitionBegin < end || transitionEnd <= transitionBegin) {
+  throw Error('Published scene transition boundary changed: re-audit');
+}
+const sceneTransitionAdapter = [
+  'function z(e,t,options={}){const state=E,hud=state.hud;',
+  'return runSceneTransition(state,{',
+  'closeMenu:()=>hud.closeMenu(),begin:()=>A(e,"CHAPTER_CARD"),wash:(opacity,seconds)=>hud.wash(opacity,seconds),',
+  'setPaused:paused=>{e.paused=paused},setDucked:ducked=>e.registry.set("audio.duck",ducked),',
+  'showClosing:closing=>hud.showClosing(closing),hideClosing:()=>hud.hideClosing(),',
+  'showCard:card=>hud.showCard(ve(card)),hideCard:()=>hud.hideCard(),wait:seconds=>hud.wait(seconds),',
+  'now:()=>performance.now(),recoverToTitle:async error=>{console.error("[game] could not change chapter",error);',
+  'await state.manager.switchTo(r);state.transitionSignal?.throwIfAborted();R(e)},',
+  'synchronize:()=>{M(e);hud.setVitals(state.vitals)},',
+  'arrive:destination=>{if(destination==="TITLE")G(e);else A(e,destination);if(destination==="PLAY")F(e)},',
+  '},t,{...options,signal:state.transitionSignal}).catch(error=>console.error("[game] chapter transition failed",error))}',
+].join('');
+const initializeGame = 'function Fe(e){if(e.input.scripted)return;';
+const initializeState = 'E={state:null,run:r,options:r.options,';
+if (gameText.split(initializeGame).length !== 2 || gameText.split(initializeState).length !== 2) {
+  throw Error('Published game initialization boundary changed: re-audit');
+}
 const rewritten = "import{" + saveImports + "}from'../../src/domain/save.mjs';\n"
-  + gameText.slice(0, start) + gameText.slice(end);
+  + "import { runSceneTransition } from '../../src/domain/scene-transition.mjs';\n"
+  + gameText.slice(0, start) + gameText.slice(end, transitionBegin) + sceneTransitionAdapter
+  + gameText.slice(transitionEnd)
+    .replace(initializeGame, 'function Fe(e,lifetime){if(e.input.scripted)return;')
+    .replace(initializeState, 'E={state:null,run:r,options:r.options,transitionSignal:lifetime?.signal,');
 
 const chapterAdapter = [
   "/* Transitional adapter: readable source module, original bundle export names. */",
@@ -144,6 +171,28 @@ const playerRewritten = [
     .replace(landingBlock,
       'function bt(e){finishLanding(q,e,k,{world:v,shake:Ie,sound:name=>p.set(`audio.cue`,{name}),hurt:Ht,isDead:Fe,die:Bt,play:(name,opts)=>y.play(name,opts),footstep:qt,changeState:J,consumeBufferedJump:_t})}'),
 ].join('\n');
+
+const hudAnimationBegin = original.hud.indexOf('if(p.tween){');
+const hudAnimationEnd = original.hud.indexOf('p.hintT>0', hudAnimationBegin);
+if (hudAnimationBegin < 0 || hudAnimationEnd <= hudAnimationBegin) {
+  throw Error('Published HUD animation boundary changed: re-audit');
+}
+let hudRewritten = original.hud.slice(0, hudAnimationBegin)
+  + 'p.timeline.advance(e);' + original.hud.slice(hudAnimationEnd);
+for (const [boundary, replacement] of [
+  ['p:0,tween:null,timers:[],', 'timeline:createHudTimeline(),'],
+  ['let M=e=>new Promise(t=>p.timers.push({left:e,resolve:t}));', ''],
+  ['wash(e,t){return p.tween?.resolve(),new Promise(n=>{p.tween={from:p.p,to:e,t:0,seconds:t,resolve:n}})},wait:M',
+    'wash:p.timeline.wash,wait:p.timeline.wait'],
+  ['revealVista(){p.veil.style.opacity=0,M(1.8).then(()=>p.veil.remove())}',
+    'revealVista(){const veil=p.veil;veil.style.opacity=0;void p.timeline.wait(1.8).then(()=>veil.remove())}'],
+  ['p.wash.draw(Math.max(p.p,', 'p.wash.draw(Math.max(p.timeline.opacity,'],
+  ['p&&=(p.root.remove(),p.style.remove(),', 'p&&=(p.timeline.dispose(),p.root.remove(),p.style.remove(),'],
+]) {
+  if (hudRewritten.split(boundary).length !== 2) throw Error('Published HUD boundary changed: ' + boundary);
+  hudRewritten = hudRewritten.replace(boundary, replacement);
+}
+hudRewritten = "import { createHudTimeline } from '../../src/runtime/hud-timeline.mjs';\n" + hudRewritten;
 
 const trailAdapter = [
   'export { findWalkableSegment as a, trailGroundAt as i, trailHeightTolerance as n,',
@@ -248,7 +297,7 @@ entryRewritten = "import { createSystemHost } from '../../src/runtime/system-hos
 const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 const replacements = {
   game: rewritten, chapters: chapterAdapter, kit: kitRewritten, collision: collisionAdapter,
-  player: playerRewritten, trail: trailAdapter, renderer: rendererRewritten,
+  player: playerRewritten, hud: hudRewritten, trail: trailAdapter, renderer: rendererRewritten,
   sight: sightAdapter, entry: entryRewritten,
 };
 if (Object.keys(replacements).length !== definitions.length ||
