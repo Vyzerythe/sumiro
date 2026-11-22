@@ -58,7 +58,7 @@ npm --prefix tests/native ci --ignore-scripts
 npm run test:gpu
 ```
 
-On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The check compares center and corner pixels at two drawing-buffer sizes and scene intensities. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also verifies encoded world normals, line weight, depth, WebGPU validation errors, and disposal. The transitional gameplay build still uses its existing renderer.
+On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The check compares center and corner pixels at two drawing-buffer sizes and scene intensities. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also verifies encoded world normals, line weight, depth, a neighboring surface selected by the reduced-resolution depth key, WebGPU validation errors, and disposal. The transitional gameplay build still uses its existing renderer.
 
 ## Toolchain policy
 

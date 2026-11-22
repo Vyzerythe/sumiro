@@ -1,8 +1,9 @@
-import type { Node, TextureNode } from 'three/webgpu';
+import type { TextureNode } from 'three/webgpu';
 import {
   clamp, dot, exp, fract, length, max, min, pow,
-  screenCoordinate, screenSize, screenUV, textureSize, vec2, vec3, vec4,
+  screenCoordinate, screenSize, screenUV, vec2, vec3, vec4,
 } from 'three/tsl';
+import { textureSize2D } from './texture-size.mts';
 
 type Rgb = readonly [number, number, number];
 
@@ -35,8 +36,7 @@ export function createInkGrade(input: TextureNode, settings: InkGradeSettings = 
     throw RangeError('Ink grade ceiling must be above the shoulder');
   }
 
-  // r187's TextureSizeNode is a uvec2, which its declaration does not expose.
-  const inputResolution = vec2(textureSize(input) as unknown as Node<'uvec2'>);
+  const inputResolution = textureSize2D(input);
   const scale = inputResolution.y.div(screenSize.y);
   const offset = vec2(filterRadiusPixels).mul(scale).div(inputResolution);
   const horizontal = vec2(offset.x, 0);
