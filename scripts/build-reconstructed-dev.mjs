@@ -224,12 +224,28 @@ const hostConstructor = 'new hv(t)';
 if (hostBegin < 0 || hostEnd <= hostBegin || entryText.split(hostConstructor).length !== 2) {
   throw Error('Published system host boundary changed: re-audit');
 }
-const entryRewritten = "import { createSystemHost } from '../../src/runtime/system-host.mjs';\n"
-  + (entryText.slice(0, hostBegin) + 'var ' + entryText.slice(hostEnd + 1)).replace(
-    hostConstructor,
-    'createSystemHost(t,{defaultBudgetMs:fg.systemMs,initializeTimeoutMs:fg.systemInitTimeoutMs,'
-    + 'now:()=>og.now(),markInitialize:name=>dg("init:"+name)})',
-  );
+let entryRewritten = entryText.slice(0, hostBegin) + 'var ' + entryText.slice(hostEnd + 1);
+const utilityBegin = entryRewritten.indexOf('mg=class{constructor(e){this.hz');
+const utilityEnd = entryRewritten.indexOf(',_g=', utilityBegin);
+if (utilityBegin < 0 || utilityEnd <= utilityBegin) {
+  throw Error('Published simulation clock and registry boundary changed: re-audit');
+}
+entryRewritten = entryRewritten.slice(0, utilityBegin) + entryRewritten.slice(utilityEnd + 1);
+for (const [boundary, replacement] of [
+  [hostConstructor, 'createSystemHost(t,{defaultBudgetMs:fg.systemMs,initializeTimeoutMs:fg.systemInitTimeoutMs,'
+    + 'now:()=>og.now(),markInitialize:name=>dg("init:"+name)})'],
+  ['new mg(tg.hz>0?tg.hz:pg.fixedHz)', 'new FixedStepClock(tg.hz>0?tg.hz:pg.fixedHz,pg.videoFps)'],
+  ['clock:new hg(e)', 'clock:new SimulationTimeReader(e)'],
+  ['registry:new gg,', 'registry:new RuntimeRegistry(),'],
+  ['t._advance(),ug(t.t)', 't.advance(),ug(t.t)'],
+]) {
+  if (entryRewritten.split(boundary).length !== 2) throw Error('Published entry boundary changed: ' + boundary);
+  entryRewritten = entryRewritten.replace(boundary, replacement);
+}
+entryRewritten = "import { createSystemHost } from '../../src/runtime/system-host.mjs';\n"
+  + "import { FixedStepClock, SimulationTimeReader } from '../../src/runtime/fixed-step-clock.mjs';\n"
+  + "import { RuntimeRegistry } from '../../src/runtime/registry.mjs';\n"
+  + entryRewritten;
 const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 
 await rm(output, { recursive: true, force: true });
@@ -283,6 +299,8 @@ const report = {
     'src/player/motion-physics.mjs',
     'src/player/movement-trail.mts',
     'src/rendering/frame-resolution.mts',
+    'src/runtime/fixed-step-clock.mts',
+    'src/runtime/registry.mts',
     'src/runtime/system-host.mts',
   ],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',

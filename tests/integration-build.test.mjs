@@ -155,6 +155,18 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputEntry, /import \{ createSystemHost \} from '\.\.\/\.\.\/src\/runtime\/system-host\.mjs'/);
     assert.match(outputEntry, /createSystemHost\(t,\{defaultBudgetMs:fg\.systemMs/);
     assert.doesNotMatch(outputEntry, /new hv\(t\)/);
+    assert.match(outputEntry, /new FixedStepClock\(tg\.hz>0\?tg\.hz:pg\.fixedHz,pg\.videoFps\)/);
+    assert.match(outputEntry, /clock:new SimulationTimeReader\(e\)/);
+    assert.match(outputEntry, /registry:new RuntimeRegistry\(\)/);
+    assert.match(outputEntry, /t\.advance\(\),ug\(t\.t\)/);
+    const { FixedStepClock } = await import(pathToFileURL(join(out, 'src/runtime/fixed-step-clock.mjs')).href);
+    const { RuntimeRegistry } = await import(pathToFileURL(join(out, 'src/runtime/registry.mjs')).href);
+    const clock = new FixedStepClock(60, 24);
+    clock.advance();
+    assert.equal(clock.now(), 1 / 60);
+    const registry = new RuntimeRegistry();
+    registry.set('time', clock);
+    assert.equal(registry.get('time'), clock);
     const { createSystemHost } = await import(pathToFileURL(join(out, 'src/runtime/system-host.mjs')).href);
     const host = createSystemHost({ scene: { children: [] } }, { defaultBudgetMs: 1, initializeTimeoutMs: 1000 });
     let updated = false;
