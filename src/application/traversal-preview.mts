@@ -50,6 +50,14 @@ interface TraversalChapter {
 
 type TraversalChapters = ChapterManager<Object3D, TraversalChapter>;
 
+function pauseTraversal(context: SourceRuntimeContext, paused: boolean) {
+  if (context.paused === paused) return;
+  context.paused = paused;
+  context.input.reset();
+  context.registry.set('game.paused', paused);
+  context.registry.set('audio.duck', paused);
+}
+
 /** Native traversal with independently prepared chapter roots and persistent player presentation. */
 export async function createTraversalPreview({ canvas, progress = createRunProgress({ getItem: () => null }), random,
   ...options }: TraversalPreviewOptions) {
@@ -126,6 +134,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     graphics: { canvas, scene, camera, buildOutput: pass => createInkRenderGraph(pass, camera, { paper: { strength: 0.75 } }) },
     systems: {
       './ground-traversal.mts': async () => ({
+        whilePaused: true,
         async init(context, lifetime) {
           if (context.audio) {
             const cues = createAudioCues({ mixer: context.audio, assets: context.assets,
@@ -230,6 +239,11 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
         },
         update(delta, context) {
           void audioCues?.update();
+          if (context.input.pause) {
+            pauseTraversal(context, !context.paused);
+            return;
+          }
+          if (context.paused) return;
           const current = synchronize(context);
           if (!current || !visual) return;
           const { player, story, mechanisms, duel, checkpoints, exit, iceHolds, killDrop, killY = -Infinity } = current.data;
@@ -284,6 +298,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
   return {
     ...runtime,
     advanceChapter,
+    setPaused(paused: boolean) { pauseTraversal(runtime.context, paused); },
     onInteraction(listener: (event: ChapterOneInteractionEvent) => void) {
       return runtime.context.registry.on('chapter.interaction', event => listener(event as ChapterOneInteractionEvent));
     },

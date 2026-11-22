@@ -16,6 +16,7 @@ interface Viewport {
 
 interface RuntimeValues extends Record<string, unknown> {
   'game.options': Partial<AudioVolumes>;
+  'game.paused': boolean;
   'audio.duck': boolean;
 }
 

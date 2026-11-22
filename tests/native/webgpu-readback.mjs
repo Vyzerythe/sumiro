@@ -432,6 +432,20 @@ try {
   }
   assert.ok(peak > takeoff.y + 0.6, 'the jump must lift the player above the authored terrain');
   assert.equal(landed, true, 'airborne motion must return to the terrain');
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyP', repeat: false }));
+  traversal.step();
+  const pauseStep = traversal.context.time.step;
+  const pausePosition = registry.get('player.position');
+  assert.equal(registry.get('game.paused'), true);
+  assert.equal(registry.get('audio.duck'), true);
+  for (let tick = 0; tick < 10; tick++) traversal.step();
+  assert.equal(traversal.context.time.step, pauseStep);
+  assert.strictEqual(registry.get('player.position'), pausePosition);
+  traversal.setPaused(false);
+  assert.equal(registry.get('game.paused'), false);
+  assert.equal(registry.get('audio.duck'), false);
+  traversal.step();
+  assert.equal(traversal.context.time.step, pauseStep + 1);
   pendingFrame(performance.now());
   traversal.render();
   const error = await device.popErrorScope();
