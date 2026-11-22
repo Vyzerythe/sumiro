@@ -1,4 +1,6 @@
 import { Color, Group, HemisphereLight, PerspectiveCamera, Scene, type Object3D } from 'three/webgpu';
+import { createAudioCues } from '../audio/audio-cues.mts';
+import type { AudioVolumes } from '../audio/audio-mixer.mts';
 import { firstChapterId } from '../domain/chapters.mts';
 import { createRunProgress } from '../domain/run-progress.mts';
 import { loadAnimatedPlayer, type AnimatedPlayer } from '../player/animated-player.mts';
@@ -18,7 +20,7 @@ import { loadChapterTwoScene } from './chapter-two-scene.mts';
 import { createChapterTwoWorld } from './chapter-two-world.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
-interface TraversalPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'gpu' | 'input' | 'viewport'> {
+interface TraversalPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'audio' | 'gpu' | 'input' | 'viewport'> {
   canvas: HTMLCanvasElement | OffscreenCanvas;
   progress?: ReturnType<typeof createRunProgress>;
 }
@@ -45,6 +47,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
   let chapters: TraversalChapters | undefined;
   let active: TraversalChapters['current'] = null;
   let visual: AnimatedPlayer | undefined;
+  let audioCues: ReturnType<typeof createAudioCues> | undefined;
   let steering: { railYaw: number; zone: string } | null = null;
   let teleport = 0;
   let switching: Promise<boolean> | undefined;
@@ -70,6 +73,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
       current.data.story?.enter(progress.current);
       if (!current.data.story) context.registry.set('chapter.interaction', { type: 'prompt', target: null });
       context.registry.set('chapter.current', current.id);
+      void audioCues?.play('chapter', current.id);
       applyView(current.data, 0, context);
     }
     return current;
@@ -91,6 +95,19 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     systems: {
       './ground-traversal.mts': async () => ({
         async init(context, lifetime) {
+          if (context.audio) {
+            const cues = createAudioCues({ mixer: context.audio, assets: context.assets,
+              reportError: (cue, error) => console.warn(`[audio cue:${cue}]`, error),
+            });
+            audioCues = cues;
+            lifetime.defer(() => cues.dispose());
+            const volumes: Partial<AudioVolumes> = {};
+            for (const key of ['master', 'music', 'ambience', 'effects', 'voice'] as const) {
+              const value = progress.current.options[key];
+              if (typeof value === 'number') volumes[key] = value;
+            }
+            context.registry.set('game.options', volumes);
+          }
           const actor = await loadAnimatedPlayer(context.assets, { signal: lifetime.signal });
           lifetime.defer(() => actor.dispose());
           lifetime.signal.throwIfAborted();
@@ -117,6 +134,9 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                   setGateBarrier: enabled => world.setGroup(chapterOneGateBarrier, enabled),
                   onEvent(event) {
                     context.registry.set('chapter.interaction', event);
+                    if (event.type === 'shrine-rested') void audioCues?.play('shrine');
+                    else if (event.type === 'scroll-captured') void audioCues?.play('scroll');
+                    else if (event.type === 'gate' && event.phase === 'dropping') void audioCues?.play('gate');
                     if (event.type === 'chapter-exit') void advanceChapter().catch(error => {
                       if (!lifetime.signal.aborted) context.registry.set('chapter.interaction', {
                         type: 'hint', text: error instanceof Error ? error.message : 'Could not load the next chapter.', ms: 4500,
@@ -140,6 +160,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
           await manager.switchTo(initialChapter, { signal: lifetime.signal });
         },
         update(delta, context) {
+          void audioCues?.update();
           const current = synchronize(context);
           if (!current || !visual) return;
           const { player, story, killDrop, killY = -Infinity } = current.data;
