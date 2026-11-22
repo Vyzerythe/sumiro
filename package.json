@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build:dev": "node scripts/build-reconstructed-dev.mjs",
+    "build:source": "node scripts/build-native-preview.mjs",
     "inventory": "node scripts/inventory-bundle.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",

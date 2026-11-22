@@ -48,7 +48,9 @@ Documentation or validation changes can be made here directly by pull request. A
 
 ## Native WebGPU verification
 
-The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and final TSL composition. Callers own the scene, camera, and additional passes. Runtime teardown awaits system cleanup before freeing the asset service and renderer. The default suite checks the generated WGSL for the grade and geometric ink contours, as well as startup rollback and pass disposal.
+The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, optional audio mixer, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and TSL output graph. Callers own the scene and camera. Runtime teardown awaits systems before releasing audio, assets, and rendering. The default suite checks generated WGSL, startup rollback, and pass disposal.
+
+To serve the native Chapter One geometry preview, run `npm run build:source` and serve the repository root. Open `http://localhost:8000/.local-build-source/` in a WebGPU-capable browser. The preview uses the installed Three.js package and the repository's geometry asset. Chapter gameplay still uses the transitional build.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 
@@ -58,7 +60,7 @@ npm --prefix tests/native ci --ignore-scripts
 npm run test:gpu
 ```
 
-On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture starts a source system, loads data, advances and pauses simulation, then compares center and corner pixels at two drawing-buffer sizes. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also checks normal encoding, discrete surface IDs, depth, a zero contour on a flat surface, a contour at a depth discontinuity, validation errors, and teardown. The transitional gameplay build still uses its existing renderer.
+On Windows, `npm run test:gpu -- backend=d3d12` explicitly selects the D3D12 backend. The fixture starts a source system, loads data, advances and pauses simulation, then compares center and corner pixels at two drawing-buffer sizes. It checks independently calculated highlight compression and falloff, with a tolerance of two 8-bit code values per channel for dithering and render-target precision. It also verifies normal encoding, surface IDs, depth, contour darkening, resize propagation, teardown, and GPU rendering of the actual Chapter One GLB.
 
 ## Toolchain policy
 

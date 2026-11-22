@@ -70,7 +70,8 @@ function useDisplaySpace(root: Object3D) {
   });
 }
 
-function discardModel(model: GLTF) {
+/** Release a loaded model whose geometry, materials and textures are exclusively owned. */
+export function disposeGLTF(model: GLTF) {
   const geometries = new Set<BufferGeometry>();
   const materials = new Set<Material>();
   const textures = new Set<Texture>();
@@ -182,7 +183,7 @@ export function createAssetManager({
           ? base : LoaderUtils.extractUrlBase(location.split(/[?#]/, 1)[0]!);
         const model = await gltfLoader.parseAsync(data, dependencyBase);
         if (signal.aborted) {
-          discardModel(model);
+          disposeGLTF(model);
           signal.throwIfAborted();
         }
         if (displaySpace && model.scene) useDisplaySpace(model.scene);

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { create, globals } from 'webgpu';
 import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
 import { mix, uniform, vec3, vec4 } from 'three/tsl';
+import { createChapterPreview } from '../../src/application/chapter-preview.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
 import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
 import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
@@ -20,9 +22,6 @@ Object.assign(globalThis, globals, {
   },
 });
 Object.defineProperty(navigator, 'gpu', { value: gpu, configurable: true });
-const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
-assert.ok(adapter, 'Dawn must expose a WebGPU adapter');
-console.log('WebGPU adapter', adapter.info.description);
 
 // Dawn supplies a real device and queue. This harness substitutes an offscreen
 // texture for the browser canvas's presentation texture.
@@ -56,6 +55,19 @@ const context = {
     unconfigured++;
     attachment?.destroy();
     attachment = undefined;
+  },
+};
+const nativeGpu = {
+  async requestAdapter(options) {
+    const adapter = await gpu.requestAdapter(options);
+    assert.ok(adapter, 'Dawn must expose a WebGPU adapter');
+    console.log('WebGPU adapter', adapter.info.description);
+    return {
+      async requestDevice(descriptor) {
+        device = await adapter.requestDevice(descriptor);
+        return device;
+      },
+    };
   },
 };
 
@@ -161,14 +173,7 @@ try {
     assets: { assetBaseURL: 'https://reference.invalid/' },
     audio: { createContext() { contextRequests++; throw Error('Audio must wait for unlock'); } },
     input: { keyboardTarget },
-    gpu: {
-      requestAdapter: async () => ({
-        async requestDevice(descriptor) {
-          device = await adapter.requestDevice(descriptor);
-          return device;
-        },
-      }),
-    },
+    gpu: nativeGpu,
   });
   assert.equal(runtime.backend, 'webgpu');
   assert.equal(runtime.context.assets.pending, 0);
@@ -246,7 +251,6 @@ try {
   assert.deepEqual([runtime.context.view.drawWidth, runtime.context.view.drawHeight], [80, 60]);
   for (const texture of [inkGraph.edge, inkGraph.composite]) {
     assert.deepEqual([texture.renderTarget.width, texture.renderTarget.height], [60, 45]);
-    texture.renderTarget.addEventListener('dispose', () => graphReleases++);
   }
   assert.equal(renderCallbacks, 8);
 
@@ -289,6 +293,9 @@ try {
   foregroundGeometry.dispose();
   foregroundMaterial.dispose();
   if (runtime) {
+    for (const texture of [inkGraph.edge, inkGraph.composite]) {
+      texture.renderTarget.addEventListener('dispose', () => graphReleases++);
+    }
     const disposing = runtime.dispose();
     assert.equal(runtime.dispose(), disposing);
     await disposing;
@@ -300,4 +307,31 @@ try {
     assert.ok(unconfigured > 0);
     assert.throws(() => runtime.render(), /disposed/);
   }
+}
+
+const assetURL = new URL('../../sumiro/assets/', import.meta.url);
+const chapter = await createChapterPreview({
+  canvas,
+  viewport: { width: 96, height: 72, pixelRatio: 1 },
+  assets: { assetBaseURL: assetURL, fetch: async path => new Response(await readFile(new URL(path))) },
+  gpu: nativeGpu,
+});
+try {
+  let meshes = 0;
+  chapter.context.scene.traverse(object => { if (object.isMesh) meshes++; });
+  assert.ok(meshes > 0, 'the actual chapter asset must populate the scene');
+  device.pushErrorScope('validation');
+  chapter.render();
+  const scan = [];
+  for (const x of [24, 36, 48, 60, 72]) {
+    for (const y of [18, 27, 36, 45, 54]) scan.push(await sample(x, y));
+  }
+  const backgroundPixel = await sample(1, 1);
+  const error = await device.popErrorScope();
+  assert.equal(error, null, error?.message);
+  assert.ok(scan.some(pixel => pixel[3] === 255 && Math.max(...pixel.slice(0, 3)) - Math.min(...pixel.slice(0, 3)) > 20),
+    'the chapter scan should include opaque, strongly colored model pixels');
+  console.log('Chapter geometry WebGPU readback', JSON.stringify({ meshes, backgroundPixel, center: scan[12] }));
+} finally {
+  await chapter.dispose();
 }
