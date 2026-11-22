@@ -17,8 +17,8 @@ Open `http://localhost:8000/sumiro/`. Compare with the unmodified published game
 ## What the script does
 
 1. Validates each chunk it will adapt against a pinned Git blob hash.
-2. Compiles the recovered TypeScript before replacing the previous development output.
-3. Copies the published distribution and readable JavaScript into `.local-build/` and writes the emitted modules alongside them.
+2. Compiles the readable TypeScript and legacy JavaScript modules before replacing the previous development output.
+3. Copies the published distribution into `.local-build/` and writes the emitted browser modules alongside it.
 4. Rebinds the copied chunks to readable source and writes their provenance to `reconstruction-build.json`.
 
 The build adapts only the listed chunks in the isolated output. The rendering backend in this build is still the published WebGL implementation.

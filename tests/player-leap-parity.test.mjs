@@ -7,7 +7,7 @@ import {
   resolveLeapRim, resolveLeapTarget, findLeapLink,
   beginLeap, advanceLeap, abortLeap,
 } from '../src/player/leap.mjs';
-import { pointInPolygon } from '../src/physics/geometry.mjs';
+import { pointInPolygon } from '../src/physics/geometry.mts';
 
 const published=await readFile(new URL('../sumiro/bundle/player-1_KrBWnI.js',import.meta.url),'utf8');
 const section=published.match(/function st\(e\)\{[\s\S]*?\}(?=function pt\(e=1\)\{)/);

@@ -1,24 +1,28 @@
 /**
  * Reconstructed geometry routines extracted from collision-DtBQEpmQ.js.
  *
- * The published implementation is the compatibility reference. These
- * functions preserve its winding, boundary, array-mutation, and edge behavior.
- * They do not yet replace the full collision-world or capsule solver.
+ * The published implementation is the compatibility reference for winding,
+ * boundary behavior, and mutation of caller-owned arrays.
  */
 
+export type PointXZ = readonly [x: number, z: number];
+
+type HeightAt = (x: number, z: number) => number;
+
 /**
- * Convert a sequence of X/Z points into double-sided vertical wall triangles.
+ * Build a triangle list of vertical walls along an X/Z polyline.
  * bottomAt/topAt are callbacks evaluated at each segment endpoint.
- *
- * @param {Array<[number,number]>} points
- * @param {(x:number,z:number)=>number} bottomAt
- * @param {(x:number,z:number)=>number} topAt
- * @param {number[]} output Mutated and returned; defaults to a new array.
+ * The output array is mutated and returned. It defaults to a new array.
  */
-export function extrudeWallPolyline(points, bottomAt, topAt, output = []) {
+export function extrudeWallPolyline(
+  points: readonly PointXZ[],
+  bottomAt: HeightAt,
+  topAt: HeightAt,
+  output: number[] = [],
+): number[] {
   for (let index = 0; index + 1 < points.length; index++) {
-    const [x0, z0] = points[index];
-    const [x1, z1] = points[index + 1];
+    const [x0, z0] = points[index]!;
+    const [x1, z1] = points[index + 1]!;
 
     // Intentionally evaluate bottom/top at the first point before the second.
     const bottom0 = bottomAt(x0, z0);
@@ -42,14 +46,14 @@ export function extrudeWallPolyline(points, bottomAt, topAt, output = []) {
  * The shipped ray-casting rule, including its strict inequality for edges.
  * Points on a polygon boundary are not guaranteed to be considered inside.
  */
-export function pointInPolygon(x, z, polygon) {
+export function pointInPolygon(x: number, z: number, polygon: readonly PointXZ[]): boolean {
   let inside = false;
   for (let index = 0, previous = polygon.length - 1;
     index < polygon.length; previous = index++) {
-    const x0 = polygon[index][0];
-    const z0 = polygon[index][1];
-    const x1 = polygon[previous][0];
-    const z1 = polygon[previous][1];
+    const x0 = polygon[index]![0];
+    const z0 = polygon[index]![1];
+    const x1 = polygon[previous]![0];
+    const z1 = polygon[previous]![1];
     if ((z0 > z) !== (z1 > z) &&
       x < ((x1 - x0) * (z - z0)) / (z1 - z0) + x0) {
       inside = !inside;

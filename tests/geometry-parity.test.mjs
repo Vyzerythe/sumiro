@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   extrudeWallPolyline, pointInPolygon,
-} from '../src/physics/geometry.mjs';
+} from '../src/physics/geometry.mts';
 import {
   n as publishedExtrudeWallPolyline,
   r as publishedPointInPolygon,

@@ -6,7 +6,7 @@
  * Numeric quirks, mutable target objects and call ordering intentionally match
  * the shipped runtime until separately proven gameplay improvements exist.
  */
-import { pointInPolygon } from '../physics/geometry.mjs';
+import { pointInPolygon } from '../physics/geometry.mts';
 
 const clamp = (value, lower, upper) => Math.min(Math.max(value, lower), upper);
 const wrapAngle = angle => {

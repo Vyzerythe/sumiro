@@ -210,10 +210,6 @@ const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(join(root, 'sumiro'), join(output, 'sumiro'), { recursive: true });
-await cp(join(root, 'src'), join(output, 'src'), {
-  recursive: true,
-  filter: path => !/\.m?ts$/.test(path),
-});
 for (const [path, contents] of compiledSource) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, contents);
@@ -238,7 +234,7 @@ const report = {
     'sumiro/bundle/trail-BFIL-IHB.js',
     'sumiro/bundle/render_pipeline-BTCk4Dyc.js',
   ],
-  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mjs', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts', 'src/rendering/frame-resolution.mts'],
+  sourceModules: ['src/domain/save.mjs', 'src/domain/chapters.mjs', 'src/domain/scrolls.mjs', 'src/physics/geometry.mts', 'src/physics/moving-body.mjs', 'src/physics/world.mjs', 'src/player/cinematic-timeline.mjs', 'src/player/ledge-path.mjs', 'src/player/input-steering.mjs', 'src/player/locomotion.mjs', 'src/player/movement-config.mjs', 'src/player/ledge-grab.mjs', 'src/player/ledge-controller.mjs', 'src/player/mantle.mjs', 'src/player/leap.mjs', 'src/player/motion-physics.mjs', 'src/player/movement-trail.mts', 'src/rendering/frame-resolution.mts'],
   limitations: 'Other chunks still ship as compiled artifacts. Browser/playthrough parity is not yet verified.',
 };
 await writeFile(join(output, 'reconstruction-build.json'), JSON.stringify(report, null, 2) + '\n');
