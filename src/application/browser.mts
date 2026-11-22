@@ -25,13 +25,13 @@ const walk = query.get('walk') === '1';
 try {
   const progress = walk && query.get('continue') === '1' ? createRunProgress({
     getItem: key => localStorage.getItem(key),
-    setItem: (key, value) => localStorage.setItem(key, value),
   }) : null;
   const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
-  const runtime = walk
-    ? await createTraversalPreview({ ...options, ...(progress?.hasSave ? { resume: progress.current } : {}),
+  const traversal = walk
+    ? await createTraversalPreview({ ...options, ...(progress ? { progress } : {}),
       input: { keyboardTarget: window, getGamepads: () => navigator.getGamepads() } })
-    : await createChapterPreview(options);
+    : null;
+  const runtime = traversal ?? await createChapterPreview(options);
   if (page.signal.aborted) {
     await runtime.dispose();
   } else {
@@ -55,8 +55,35 @@ try {
       void runtime.dispose().catch(error => console.error(error));
     }, { once: true });
     status.hidden = !walk;
-    if (walk) {
-      status.textContent = 'WASD or arrows to move · Space to jump';
+    if (traversal) {
+      const controls = 'WASD or arrows to move · Space to jump';
+      let prompt = controls;
+      let notice: number | undefined;
+      status.textContent = controls;
+      function showNotice(text: string, duration: number) {
+        window.clearTimeout(notice);
+        statusMessage.textContent = text;
+        notice = window.setTimeout(() => {
+          notice = undefined;
+          statusMessage.textContent = prompt;
+        }, duration);
+      }
+      const unsubscribe = traversal.onInteraction(event => {
+        switch (event.type) {
+          case 'prompt':
+            prompt = event.target?.prompt ?? controls;
+            if (notice === undefined) statusMessage.textContent = prompt;
+            break;
+          case 'shrine-rested': showNotice('The lantern is lit.', 3800); break;
+          case 'scroll-captured': showNotice(event.lines.join('\n'), 6000); break;
+          case 'hint': showNotice(event.text, event.ms); break;
+          case 'chapter-exit': showNotice('Chapter One exit reached.', 3800); break;
+        }
+      });
+      page.signal.addEventListener('abort', () => {
+        unsubscribe();
+        window.clearTimeout(notice);
+      }, { once: true });
       runtime.start();
     }
     observer.observe(canvas);

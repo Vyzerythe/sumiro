@@ -50,9 +50,9 @@ Documentation or validation changes can be made here directly by pull request. A
 
 The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, optional audio mixer, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and TSL output graph. Callers own the scene and camera. Runtime teardown awaits systems before releasing audio, assets, and rendering. The default suite checks generated WGSL, startup rollback, and pass disposal.
 
-To serve the native Chapter One preview, run `npm run build:source` and serve the repository root. Open `http://localhost:8000/.local-build-source/` in a WebGPU-capable browser to inspect the GLB. Add `?walk=1` to traverse the recovered collision terrain with WASD or the arrow keys and jump with Space. This mode draws ground surfaces, uses the authored camera rail, and applies the chapter's static collision obstacles. Chapter progression still uses the transitional build.
+To serve the native Chapter One preview, run `npm run build:source` and serve the repository root. Open `http://localhost:8000/.local-build-source/` in a WebGPU-capable browser to inspect the GLB. Add `?walk=1` to traverse the recovered collision terrain with WASD or the arrow keys and jump with Space. This mode draws ground surfaces, uses the authored camera rail, and applies the chapter's static collision obstacles. It also supports authored gap leaps, ledge climbing, shrine and scroll interactions, and the ink-pool sequence. Chapter progression beyond the native Chapter One exit still uses the transitional build.
 
-The traversal preview uses the supplied player model and its gait, jump, fall, and landing clips. Use `?walk=1&continue=1` to read a Chapter One checkpoint from the same browser origin. The preview can resume the table and plateau shrines and leaves stored saves untouched.
+The traversal preview uses the supplied player model and its traversal clips. Use `?walk=1&continue=1` to read a Chapter One checkpoint from the same browser origin. The preview can resume the table and plateau shrines and leaves stored saves untouched. The native test injects a writable store to verify explicit shrine interaction saves.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 

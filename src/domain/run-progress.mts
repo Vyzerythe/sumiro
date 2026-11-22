@@ -1,7 +1,7 @@
 import { abilitiesAtChapter, findChapter, transitionToChapter, type ChapterAbilities } from './chapters.mts';
 import { createDefaultRun, loadSave, writeSave, type LoadedSave } from './save.mts';
 
-type RunStorage = Pick<Storage, 'getItem' | 'setItem'>;
+type RunStorage = Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem'>>;
 type Run = LoadedSave & {
   shrine: string | null;
   flags: Record<string, unknown>;
@@ -34,7 +34,8 @@ export function createRunProgress(storage: RunStorage) {
   let switching = false;
 
   function persist() {
-    const written = writeSave(run, storage);
+    if (!storage.setItem) return false;
+    const written = writeSave(run, { setItem: storage.setItem.bind(storage) });
     hasSave ||= written;
     return written;
   }
@@ -49,6 +50,15 @@ export function createRunProgress(storage: RunStorage) {
     checkpoint(shrine: string) {
       if (!shrine) throw Error('A checkpoint needs a shrine ID');
       run.shrine = shrine;
+      return persist();
+    },
+    collectScroll(id: string) {
+      if (!run.scrolls.includes(id)) run.scrolls = [...run.scrolls, id];
+      return persist();
+    },
+    learnInkStep() {
+      run.flags.inkStep = true;
+      run.abilities.inkStep = true;
       return persist();
     },
     /** Commit progression after the incoming chapter has activated. */

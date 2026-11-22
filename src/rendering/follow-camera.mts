@@ -41,6 +41,8 @@ export interface FollowCameraFrame {
   speed?: number;
   /** Change this counter when relocating the player discontinuously. */
   teleport?: number;
+  /** Authored frame target for a scripted move beyond the walking tracks. */
+  frameTarget?: number;
 }
 
 export interface FollowCameraPose extends FollowRailPose {
@@ -188,7 +190,7 @@ export function createFollowCamera({ rail, sight, world, wayUpAreas = [] }: Foll
   let zone: FollowCameraPose['zone'] = 'way_up';
   let area: FollowCameraArea | undefined;
 
-  function update({ feet, deltaSeconds: delta, movement, speed, teleport = 0 }: FollowCameraFrame): FollowCameraPose {
+  function update({ feet, deltaSeconds: delta, movement, speed, teleport = 0, frameTarget }: FollowCameraFrame): FollowCameraPose {
     if (!Number.isFinite(delta) || delta < 0 || ![feet.x, feet.y, feet.z].every(Number.isFinite)) {
       throw new RangeError('Camera updates require finite position and nonnegative elapsed time');
     }
@@ -202,19 +204,21 @@ export function createFollowCamera({ rail, sight, world, wayUpAreas = [] }: Foll
       area = undefined;
     }
     hint = projectTrack(tracks[zone], feet, hint, LOCAL_SEARCH_FRAMES);
+    const target = frameTarget ?? hint;
+    if (!Number.isFinite(target) || target < 0) throw RangeError('Rail frame target must be nonnegative and finite');
 
     if (snap) {
-      frame = targetFrame = hint;
+      frame = targetFrame = target;
       frameVelocity = measuredSpeed = 0;
     } else if (delta > 0) {
-      const error = hint - frame;
+      const error = target - frame;
       const maximumRate = Math.abs(error) > 6 ? 66 : 40;
-      const targetVelocity = clamp((hint - targetFrame) / delta + error * 6, -maximumRate, maximumRate);
+      const targetVelocity = clamp((target - targetFrame) / delta + error * 6, -maximumRate, maximumRate);
       const approach = -Math.expm1(-12 * delta);
       // Integrate velocity across the step so a longer update cannot overapply the final velocity.
       frame += targetVelocity * delta + (frameVelocity - targetVelocity) * approach / 12;
       frameVelocity += (targetVelocity - frameVelocity) * approach;
-      targetFrame = hint;
+      targetFrame = target;
       measuredSpeed += (Math.hypot(feet.x - lastX, feet.z - lastZ) / delta - measuredSpeed) *
         -Math.expm1(-delta / 0.1);
     }

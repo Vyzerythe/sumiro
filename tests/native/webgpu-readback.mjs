@@ -439,21 +439,38 @@ try {
   await traversal.dispose();
 }
 
+const checkpoints = [];
 const resumedRun = createRunProgress({
-  getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau' }),
-  setItem() { throw Error('The preview must never save a resumed run'); },
+  getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau', flags: { inkStep: true }, abilities: { inkStep: true } }),
+  setItem(key, value) { checkpoints.push([key, JSON.parse(value)]); },
 });
 const resumed = await createTraversalPreview({
   canvas,
   viewport: { width: 96, height: 72, pixelRatio: 1 },
   assets: chapterAssets,
-  resume: resumedRun.current,
+  progress: resumedRun,
+  input: { keyboardTarget },
   gpu: nativeGpu,
 });
 try {
   const position = resumed.context.registry.get('player.position');
   assert.deepEqual([position.x, position.z], [14.6, -56.6]);
   assert.ok(position.grounded && position.y > 8);
+  assert.deepEqual(checkpoints, [], 'resuming must not write a save');
+  const events = [];
+  const unsubscribe = resumed.onInteraction(event => events.push(event));
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyE', repeat: false }));
+  resumed.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyE' }));
+  unsubscribe();
+  assert.ok(events.some(event => event.type === 'shrine-rested' && event.id === 'plateau'));
+  assert.equal(checkpoints.length, 1);
+  assert.equal(checkpoints[0][0], 'sumiro.save.v1');
+  assert.equal(checkpoints[0][1].shrine, 'plateau');
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'ShiftLeft', repeat: false }));
+  resumed.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'ShiftLeft' }));
+  assert.equal(resumed.context.registry.get('player.position').state, 'DODGE');
   device.pushErrorScope('validation');
   resumed.render();
   const error = await device.popErrorScope();

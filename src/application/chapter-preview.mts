@@ -3,6 +3,7 @@ import type { Object3D } from 'three/webgpu';
 import { disposeGLTF } from '../assets/asset-manager.mts';
 import { firstChapterId } from '../domain/chapters.mts';
 import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
+import { bindInkMeshMaterials } from '../rendering/ink-mesh-materials.mts';
 import { createChapterManager } from '../runtime/chapter-manager.mts';
 import { createSourceRuntime } from '../runtime/source-runtime.mts';
 
@@ -53,6 +54,7 @@ export async function createChapterPreview({ canvas, ...options }: ChapterPrevie
               });
               resources.defer(() => disposeGLTF(model));
               resources.signal.throwIfAborted();
+              resources.defer(bindInkMeshMaterials(model.scene));
               const box = new Box3().setFromObject(model.scene);
               if (box.isEmpty()) throw Error('Chapter geometry contains no bounded meshes');
               return { root: model.scene, data: box.getBoundingSphere(new Sphere()) };
