@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   chapters, firstChapterId, findChapter, abilitiesAtChapter, transitionToChapter,
-} from "../src/domain/chapters.mjs";
+} from "../src/domain/chapters.mts";
 import {
   t as originalChapters,
   n as originalFirst,

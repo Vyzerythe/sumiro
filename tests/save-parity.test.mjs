@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
-import { findChapter, firstChapterId } from "../src/domain/chapters.mjs";
+import { findChapter, firstChapterId } from "../src/domain/chapters.mts";
 import {
   saveKey, legacySaveKey, legacyChapterAliases, defaultOptions,
   migrateOptions, createDefaultRun, isSupportedSave,
   normalizeSaveChapters, loadSave, writeSave,
-} from "../src/domain/save.mjs";
+} from "../src/domain/save.mts";
 
 /**
  * Extract only the self-contained save-function prelude from the immutable
@@ -142,4 +142,38 @@ test("save writes preserve bytes, key, and failure handling", () => {
   const a = makeStorage({}, { failWrite: true });
   const b = makeStorage({}, { failWrite: true });
   assert.equal(writeSave({ v: 1 }, a), reference(b)._({ v: 1 }));
+});
+
+test("permissive stored fields and inherited alias lookups retain round-trip bytes", () => {
+  const serialized = JSON.stringify({
+    v: 1, chapter: "unknown", shrine: "old", flags: "legacy", abilities: ["legacy"],
+    unlocked: ["constructor", ["ch2_stub"], ["ch3_pines"]], scrolls: [9, null],
+    options: { vol: "2", music: null, extra: 20 }, futureField: { keep: true },
+  });
+  const actualStorage = makeStorage({ [legacySaveKey]: serialized });
+  const originalStorage = makeStorage({ [legacySaveKey]: serialized });
+  const oracle = reference(originalStorage);
+  const actual = loadSave(actualStorage);
+  const expected = oracle.g();
+  assert.ok(actual);
+  assert.equal(actual.chapter, "ch2_pass");
+  assert.deepEqual(actual.unlocked, ["ch1_climb", "ch2_pass"]);
+  assert.equal(actual.shrine, null);
+  assert.equal(writeSave(actual, actualStorage), oracle._(expected));
+  assert.deepEqual(actualStorage.calls, originalStorage.calls);
+  assert.deepEqual(actualStorage.snapshot(), originalStorage.snapshot());
+});
+
+test("blocked browser storage fails without throwing from the localStorage getter", context => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() { throw new DOMException("Storage denied", "SecurityError"); },
+  });
+  context.after(() => {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else delete globalThis.localStorage;
+  });
+  assert.equal(loadSave(), null);
+  assert.equal(writeSave({ v: 1 }), false);
 });

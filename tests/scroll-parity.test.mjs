@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
-import { chapters } from "../src/domain/chapters.mjs";
+import { chapters } from "../src/domain/chapters.mts";
 import { scrollTexts, scrollCount, scrollsByChapter } from "../src/domain/scrolls.mjs";
 
 const source = await readFile(new URL("../sumiro/bundle/kit-B01EgPBo.js", import.meta.url), "utf8");

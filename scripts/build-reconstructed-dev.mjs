@@ -231,6 +231,13 @@ if (utilityBegin < 0 || utilityEnd <= utilityBegin) {
   throw Error('Published simulation clock and registry boundary changed: re-audit');
 }
 entryRewritten = entryRewritten.slice(0, utilityBegin) + entryRewritten.slice(utilityEnd + 1);
+const optionsBegin = entryRewritten.indexOf('function Yh(e,t)');
+const optionsEnd = entryRewritten.indexOf('function rg(e)', optionsBegin);
+if (optionsBegin < 0 || optionsEnd <= optionsBegin) throw Error('Published launch options boundary changed: re-audit');
+entryRewritten = entryRewritten.slice(0, optionsBegin)
+  + 'const launchOptions=parseLaunchOptions(window.location.search),tg=launchOptions.options;'
+  + 'function ng(){for(const diagnostic of launchOptions.diagnostics)console.error("[engine] "+diagnostic)}'
+  + entryRewritten.slice(optionsEnd);
 const loopBegin = entryRewritten.indexOf('runLive(){let{ctx:e}=this');
 const loopEnd = entryRewritten.indexOf('}_perfWarn(', loopBegin);
 if (loopBegin < 0 || loopEnd <= loopBegin) throw Error('Published live frame loop boundary changed: re-audit');
@@ -260,6 +267,7 @@ entryRewritten = "import { createSystemHost } from '../../src/runtime/system-hos
   + "import { FixedStepClock, SimulationTimeReader } from '../../src/runtime/fixed-step-clock.mjs';\n"
   + "import { RuntimeRegistry } from '../../src/runtime/registry.mjs';\n"
   + "import { startLiveLoop } from '../../src/runtime/live-loop.mjs';\n"
+  + "import { parseLaunchOptions } from '../../src/runtime/launch-options.mjs';\n"
   + entryRewritten;
 const compiledSource = compileReconstructedSource(root, join(output, 'src'));
 
@@ -295,8 +303,8 @@ const report = {
     'sumiro/bundle/index-DnHRwVtn.js',
   ],
   sourceModules: [
-    'src/domain/save.mjs',
-    'src/domain/chapters.mjs',
+    'src/domain/save.mts',
+    'src/domain/chapters.mts',
     'src/domain/scrolls.mjs',
     'src/physics/geometry.mts',
     'src/physics/moving-body.mts',
@@ -316,6 +324,7 @@ const report = {
     'src/rendering/frame-resolution.mts',
     'src/runtime/fixed-step-clock.mts',
     'src/runtime/frame-scheduler.mts',
+    'src/runtime/launch-options.mts',
     'src/runtime/live-loop.mts',
     'src/runtime/registry.mts',
     'src/runtime/system-host.mts',

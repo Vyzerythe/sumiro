@@ -141,3 +141,7 @@ The copied entry delegates subsystem loading, updates, render callbacks, and cha
 The entry also loads the typed fixed-step clock and registry. Simulation time is derived from the step index, and registry notifications preserve snapshot ordering. A listener that throws during initial replay is removed before the error is propagated.
 
 The live frame loop uses a renderer-independent scheduler. It carries fractional time between frames, bounds simulation work after a hitch, and permits a redraw while paused after resize. The page teardown cancels its pending frame callback before disposing systems.
+
+### Launch configuration and persistence
+
+The typed launch parser preserves the original query modes and raw parameters. It rejects incomplete camera coordinates and zero or unsafe viewport dimensions. Save and chapter data use typed interfaces while preserving the shipped storage keys, load priority, transition identity, and permissive legacy fields. Storage access errors return the same failure values as the bundled game.

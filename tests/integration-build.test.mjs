@@ -162,6 +162,11 @@ test('source-backed build preserves originals and binds live domain imports', as
     assert.match(outputEntry, /this\.liveLoop=startLiveLoop\(/);
     assert.match(outputEntry, /r\.liveLoop\?\.invalidate\(\)/);
     assert.match(outputEntry, /r\.liveLoop\?\.stop\(\);n\.dispose\(\)/);
+    assert.match(outputEntry, /launchOptions=parseLaunchOptions\(window\.location\.search\),tg=launchOptions\.options/);
+    const { parseLaunchOptions } = await import(pathToFileURL(join(out, 'src/runtime/launch-options.mjs')).href);
+    const launch = parseLaunchOptions('?play=1&size=1280x720');
+    assert.deepEqual(launch.options.size, { width: 1280, height: 720 });
+    assert.equal(launch.options.raw.get('play'), '1');
     const { startLiveLoop } = await import(pathToFileURL(join(out, 'src/runtime/live-loop.mjs')).href);
     assert.equal(typeof startLiveLoop, 'function');
     const { FixedStepClock } = await import(pathToFileURL(join(out, 'src/runtime/fixed-step-clock.mjs')).href);
