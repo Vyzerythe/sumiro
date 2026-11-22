@@ -5,7 +5,7 @@ import { createInkSurfaceOutput } from '../rendering/ink-surface-pass.mts';
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
 import { chapterFiveMechanismSites } from './chapter-five-mechanisms.mts';
 
-/** Native sea lacquer base. The published depth-lip and mirror passes are separate effects. */
+/** Earlier opaque Sea prototype, superseded by the native depth-aware shoreline pass. */
 export function createChapterFiveWater(lifetime: ChapterLifetime) {
   const noise = createInkNoiseTexture();
   lifetime.defer(() => noise.dispose());

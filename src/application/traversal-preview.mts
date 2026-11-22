@@ -1,4 +1,5 @@
 import { Color, Group, HemisphereLight, PerspectiveCamera, Scene, type Object3D } from 'three/webgpu';
+import { uniform } from 'three/tsl';
 import { createAudioCues } from '../audio/audio-cues.mts';
 import type { AudioVolumes } from '../audio/audio-mixer.mts';
 import { firstChapterId } from '../domain/chapters.mts';
@@ -29,6 +30,7 @@ import { loadCompanionPresentation } from './companion-presentation.mts';
 import { loadEncounterCombat } from './encounter-combat.mts';
 import { getStaticChapter } from './static-chapter-catalog.mts';
 import { createStaticTraversalCamera } from './static-traversal-camera.mts';
+import { createStoryPresentation } from './story-presentation.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 interface TraversalPreviewOptions extends Pick<RuntimeOptions, 'assets' | 'audio' | 'gpu' | 'input' | 'viewport'> {
@@ -44,6 +46,8 @@ interface TraversalChapter {
   origin: GroundedSpawn;
   view: ReturnType<typeof createChapterOneCamera> | ReturnType<typeof createStaticTraversalCamera>;
   story?: ReturnType<typeof createChapterOneInteractions>;
+  cutscene?: ReturnType<typeof createStoryPresentation>;
+  updateEnvironment?: Awaited<ReturnType<typeof loadChapterOneTraversalScene>>['updateEnvironment'];
   mechanisms?: { driver: ReturnType<typeof createChapterTwoMechanisms>; present(): void };
   duel?: Awaited<ReturnType<typeof loadChapterTwoDuel>>;
   checkpoints?: ReturnType<typeof createCheckpointInteraction>;
@@ -74,6 +78,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
   scene.background = new Color().setRGB(...INK_PAPER_BASE);
   scene.add(new HemisphereLight(0xfff1dc, 0x777571, 2.5));
   const camera = new PerspectiveCamera(52, options.viewport.width / options.viewport.height, 0.1, 100);
+  const sea = { enabled: uniform(false), level: uniform(0), seconds: uniform(0), stir: uniform(0) };
   let chapters: TraversalChapters | undefined;
   let active: TraversalChapters['current'] = null;
   let visual: AnimatedPlayer | undefined;
@@ -89,12 +94,21 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
     return { x, y, z, heading, state, grounded, speed: Math.hypot(vx, vz), onCarrier: carrier !== null };
   }
 
-  function applyView({ player, view }: TraversalChapter, delta: number, context: SourceRuntimeContext) {
+  function applyView({ player, view, lateMechanisms, updateEnvironment, cutscene }: TraversalChapter, delta: number, context: SourceRuntimeContext) {
+    const water = lateMechanisms?.sea;
+    sea.enabled.value = water !== undefined;
+    if (water) {
+      sea.level.value = water.level;
+      sea.seconds.value = water.seconds;
+      sea.stir.value = water.stir;
+    }
     const { x, y, z, grounded, state } = player.state;
     const pose = view(player.state, delta, teleport);
     steering = { railYaw: pose.yaw, zone: pose.zone };
     camera.position.set(pose.x, pose.y, pose.z);
     camera.rotation.set(pose.pitch * Math.PI / 180, pose.yaw * Math.PI / 180, 0);
+    cutscene?.presentCamera(delta);
+    if (pose.railFrame !== null) updateEnvironment?.({ railFrame: pose.railFrame, cameraY: camera.position.y });
     context.registry.set('player.position', { x, y, z, grounded, state });
     context.registry.set('camera.railFrame', pose.railFrame);
   }
@@ -150,7 +164,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
 
   const runtime = await createSourceRuntime({
     ...options,
-    graphics: { canvas, scene, camera, buildOutput: pass => createInkRenderGraph(pass, camera, { paper: { strength: 0.75 } }) },
+    graphics: { canvas, scene, camera, buildOutput: pass => createInkRenderGraph(pass, camera, { paper: { strength: 0.75 }, sea }) },
     systems: {
       './ground-traversal.mts': async () => ({
         whilePaused: true,
@@ -175,6 +189,7 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
           lifetime.ownRoot(actor.root);
           visual = actor;
           catVisual = await loadCompanionPresentation(context.assets, lifetime, actor.root);
+          const cat = catVisual;
           lifetimeSignal = lifetime.signal;
           const stage = lifetime.ownRoot(new Group());
           const canInkStep = () => progress.current.abilities.inkStep === true;
@@ -189,8 +204,16 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                   } satisfies ChapterOneInteractionEvent);
                 });
               }
+              function scenePresentation(id: 'opening_cat' | 'reunion', root: Object3D, world: CollisionWorld,
+                player: TraversalChapter['player'], companion: TraversalChapter['companion']) {
+                return createStoryPresentation({ id, root, lifetime: resources, world, player, companion, actor, cat, camera,
+                  audio: audioCues,
+                  onActive(scene) { context.registry.set('story.scene', scene); },
+                  onSubtitle(line) { context.registry.set('story.subtitle', line); },
+                });
+              }
               if (id === firstChapterId) {
-                const { world, root } = await loadChapterOneTraversalScene(context.assets, resources);
+                const { world, root, updateEnvironment } = await loadChapterOneTraversalScene(context.assets, resources);
                 const spawn = resolveChapterSpawn(id, chapterOneSpawn, resumeState, world);
                 const player = createTraversalController(world, spawn, {
                   ledges: chapterOneLedges, leapLinks: chapterOneLeapLinks, duration: actor.duration, canInkStep,
@@ -209,7 +232,9 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                     if (event.type === 'chapter-exit') requestNextChapter(context);
                   },
                 });
-                return { root, data: { world, origin: chapterOneSpawn, player, story, companion: companion(world),
+                const partner = companion(world);
+                const cutscene = scenePresentation('opening_cat', root, world, player, partner);
+                return { root, data: { world, origin: chapterOneSpawn, player, story, updateEnvironment, cutscene, companion: partner,
                   view: createChapterOneCamera(world, actor.duration('climb_up')), killDrop: 5.5 } };
               }
               const definition = getStaticChapter(id);
@@ -273,12 +298,14 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
                 }, random);
                 root.add(duel.root);
               }
-              return { root, data: { world, origin, player, companion: companion(world),
+              const partner = companion(world);
+              const cutscene = id === 'ch6_summit' ? scenePresentation('reunion', root, world, player, partner) : undefined;
+              return { root, data: { world, origin, player, companion: partner,
                 view: createStaticTraversalCamera(world, id), killDrop, killY,
                 checkpoints: createCheckpointInteraction(id, world, progress),
                 ...(mechanisms ? { mechanisms } : {}), ...(duel ? { duel } : {}), ...(exit ? { exit } : {}),
                 ...(iceHolds ? { iceHolds } : {}), ...(lateMechanisms ? { lateMechanisms } : {}),
-                ...(combat ? { combat } : {}) } };
+                ...(combat ? { combat } : {}), ...(cutscene ? { cutscene } : {}) } };
             },
           });
           const manager = chapters;
@@ -287,15 +314,28 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
         },
         update(delta, context) {
           void audioCues?.update();
+          const current = synchronize(context);
+          const cutscene = current?.data.cutscene;
+          if (cutscene?.active && (context.input.pause || context.input.menu.confirm || context.input.menu.back)) {
+            cutscene.skip();
+            context.input.reset();
+            if (current) applyView(current.data, 0, context);
+            return;
+          }
           if (context.input.pause) {
             pauseTraversal(context, !context.paused);
             return;
           }
           if (context.paused) return;
-          const current = synchronize(context);
           if (!current || !visual) return;
           const { player, companion, story, mechanisms, duel, checkpoints, exit, iceHolds, lateMechanisms, combat,
             killDrop, killY = -Infinity } = current.data;
+          cutscene?.trigger(delta, Boolean(progress.current.flags.ch6_duel));
+          cutscene?.step(delta);
+          if (cutscene?.active) {
+            applyView(current.data, delta, context);
+            return;
+          }
           iceHolds?.step(delta, { state: player.state.state, ledge: player.state.ledge, teleports: teleport });
           if (mechanisms) {
             const { driver, present } = mechanisms;
@@ -348,7 +388,9 @@ export async function createTraversalPreview({ canvas, progress = createRunProgr
             void audioCues?.play('shrine');
             context.registry.set('chapter.interaction', { type: 'hint', text: 'The lantern is lit.', ms: 3800 });
           }
-          if (exit?.update(delta, player.state, progress.current.flags)) requestNextChapter(context, exit);
+          if ((current.id !== 'ch6_summit' || cutscene?.complete) && exit?.update(delta, player.state, progress.current.flags)) {
+            requestNextChapter(context, exit);
+          }
           applyView(current.data, delta, context);
         },
         beforeRender: synchronize,

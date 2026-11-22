@@ -8,7 +8,7 @@ const SURFACE_COLORS: Readonly<Record<string, number>> = {
   stone: 0x858582, wood: 0x937053, stair: 0x6d797d, rock: ROCK_COLOR, 'ink-rock': 0x56656b,
 };
 
-/** Ground visualization for levels whose authored render assembly is still in progress. */
+/** Former development terrain view, superseded by the authored Chapter One environment. */
 export function createCollisionSurfacePreview(world: CollisionWorld, lifetime: ChapterLifetime) {
   const terrain = new Group();
   const batches = new Map<CollisionSurface, CollisionTriangle[]>();

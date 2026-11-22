@@ -43,6 +43,7 @@ export function createRunProgress(storage: RunStorage) {
   return {
     get current(): Readonly<Run> { return run; },
     get hasSave() { return hasSave; },
+    save: persist,
     tick(seconds: number) {
       if (!Number.isFinite(seconds) || seconds < 0) throw RangeError('Play time must be finite and nonnegative');
       run.playS += seconds;

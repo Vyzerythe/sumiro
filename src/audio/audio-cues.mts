@@ -2,7 +2,8 @@
 import type { AssetManager } from '../assets/asset-manager.mts';
 import type { AudioMixer } from './audio-mixer.mts';
 
-export type AudioCue = 'chapter' | 'shrine' | 'scroll' | 'gate';
+type EffectCue = 'shrine' | 'scroll' | 'gate';
+export type AudioCue = 'chapter' | EffectCue | 'story';
 
 export interface AudioCuesOptions {
   mixer: Pick<AudioMixer, 'context' | 'buses'>;
@@ -95,12 +96,13 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
 
   function startVoice(
     cue: AudioCue, source: AudioScheduledSourceNode, nodes: readonly AudioNode[],
-    destination: AudioNode, start: () => void, end?: number,
+    destination: AudioNode, start: () => void, end?: number, signal?: AbortSignal,
   ): Voice {
     const allocated = [source, ...nodes];
     const voice = { stop: () => release(true) };
     function release(stop: boolean) {
       if (!voices.delete(voice)) return;
+      signal?.removeEventListener('abort', voice.stop);
       source.onended = null;
       if (stop) {
         try { source.stop(); } catch { /* A failed start or closed context may have ended it. */ }
@@ -111,6 +113,7 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
       if (chapter?.voice === voice) chapter = undefined;
     }
     voices.add(voice);
+    signal?.addEventListener('abort', voice.stop, { once: true });
     source.onended = () => release(false);
     try {
       let previous: AudioNode = source;
@@ -195,7 +198,7 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
     noiseVoice(cue, output, when, attack + hold + decay + 0.05, band, gain, flutter);
   }
 
-  function playEffect(cue: Exclude<AudioCue, 'chapter'>, output: Playback) {
+  function playEffect(cue: EffectCue, output: Playback) {
     const now = output.context.currentTime;
     switch (cue) {
       case 'shrine':
@@ -217,6 +220,26 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
         burst(cue, output, now + 1.1, -18, 0.03, { type: 'bandpass', frequency: 500, q: 0.7 });
         break;
     }
+  }
+
+  function playRecording(path: string, bus: 'voice' | 'effects', signal: AbortSignal, db = 0) {
+    const output = playback();
+    const destination = mixer.buses?.[bus];
+    let duration: number | undefined;
+    if (output && destination && !signal.aborted) {
+      const { context } = output;
+      const active = AbortSignal.any([signal, lifetime.signal]);
+      void assets.loadArrayBuffer(path, { signal: active }).then(bytes => context.decodeAudioData(bytes)).then(buffer => {
+        if (active.aborted || context.state !== 'running') return;
+        duration = buffer.duration;
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const gain = context.createGain();
+        gain.gain.value = gainFromDb(db);
+        startVoice('story', source, [gain], destination, () => source.start(), undefined, active);
+      }).catch(error => { if (!active.aborted) report('story', error); });
+    }
+    return { duration: () => duration };
   }
 
   async function prepareChapter(request: ChapterRequest, context: AudioContext) {
@@ -287,7 +310,7 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
   }
 
   return {
-    async play(cue: AudioCue, chapterId = 'ch1_climb'): Promise<boolean> {
+    async play(cue: 'chapter' | EffectCue, chapterId = 'ch1_climb'): Promise<boolean> {
       if (lifetime.signal.aborted) return false;
       if (cue === 'chapter') {
         const id = /^ch[1-6](?=_|$)/.exec(chapterId)?.[0];
@@ -304,6 +327,7 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
       if (!output) return false;
       try { playEffect(cue, output); return true; } catch (error) { report(cue, error); return false; }
     },
+    playRecording,
     /** Schedules the latest chapter request when the existing mixer is running. */
     update,
     dispose() {

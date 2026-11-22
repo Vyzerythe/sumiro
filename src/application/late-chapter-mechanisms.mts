@@ -1,4 +1,4 @@
-import type { Object3D } from 'three/webgpu';
+import { Object3D } from 'three/webgpu';
 import type { EncounterState } from '../combat/encounters.mts';
 import type { createRunProgress } from '../domain/run-progress.mts';
 import type { CollisionWorld } from '../physics/world.mts';
@@ -6,7 +6,6 @@ import type { createTraversalController } from '../player/traversal-controller.m
 import type { ChapterLifetime } from '../runtime/chapter-manager.mts';
 import { createChapterFiveMechanisms } from './chapter-five-mechanisms.mts';
 import { chapterFiveGateSites, createChapterFiveGates } from './chapter-five-gates.mts';
-import { createChapterFiveWater } from './chapter-five-water.mts';
 import { mountChapterFiveCurtains } from './chapter-five-curtains.mts';
 import { createChapterFourMechanisms } from './chapter-four-mechanisms.mts';
 import { bindChapterFourPresentation } from './chapter-four-presentation.mts';
@@ -25,6 +24,7 @@ interface MechanismEffects {
 export interface LateChapterMechanisms {
   reset(): void;
   inkStep?(): void;
+  sea?: Readonly<{ level: number; seconds: number; stir: number }>;
   /** Returns true when the mechanism requires the player to respawn. */
   step(frame: { delta: number; player: Player; attack: boolean; interact: boolean; seconds: number; cameraZ: number }): boolean;
 }
@@ -70,14 +70,15 @@ export function mountLateChapterMechanisms(id: string, world: CollisionWorld, ro
     case 'ch5_sea': {
       const scene = root.children[0];
       if (!scene) throw Error('The supplied Sea scene is missing');
-      const water = createChapterFiveWater(lifetime);
-      root.add(water.node);
+      const water = new Object3D();
+      water.name = 'sea';
+      root.add(water);
       let fell = false;
       const driver = createChapterFiveMechanisms(world, {
         onCue: cue => onEvent({ type: 'cue', ...cue }), onFallOut: () => { fell = true; },
       });
       lifetime.defer(() => driver.dispose());
-      driver.bind(scene, water.node);
+      driver.bind(scene, water);
       const gates = createChapterFiveGates(world, {
         hasFlag: flag => Boolean(progress.current.flags[flag]),
         setFlag: flag => { progress.setFlag(flag); },
@@ -88,6 +89,7 @@ export function mountLateChapterMechanisms(id: string, world: CollisionWorld, ro
       lifetime.defer(() => gates.dispose());
       gates.bind(root, { onVeil: mountChapterFiveCurtains(root, lifetime) });
       return {
+        get sea() { return { level: driver.tide.y, seconds: driver.presentation.seconds, stir: driver.presentation.stir }; },
         reset() { driver.reset(); gates.reset(); fell = false; },
         inkStep: gates.inkStep,
         step({ delta, player: { state }, attack, interact, seconds, cameraZ }) {
@@ -98,7 +100,6 @@ export function mountLateChapterMechanisms(id: string, world: CollisionWorld, ro
           const bell = chapterFiveGateSites.bell;
           if ((attack || interact) && state.grounded && Math.abs(state.y - bell.standY) < 1.6 &&
             Math.hypot(state.x - bell.x, state.z - bell.z) < bell.reach) gates.ringBell(attack ? 'strike' : 'interact');
-          water.update(driver.presentation.seconds, driver.presentation.stir);
           return fell;
         },
       };

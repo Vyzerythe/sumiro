@@ -1,5 +1,6 @@
 import { createRunProgress } from '../domain/run-progress.mts';
-import { createDefaultRun } from '../domain/save.mts';
+import { createNativeSaveStorage } from '../domain/native-save-storage.mts';
+import { createDefaultRun, saveKey } from '../domain/save.mts';
 import { createChapterPreview } from './chapter-preview.mts';
 import { createTraversalPreview } from './traversal-preview.mts';
 
@@ -38,7 +39,10 @@ let stopInterface: (() => void) | undefined;
 let starting = false;
 let closing: Promise<void> | undefined;
 
-const readProgress = () => createRunProgress({ getItem: key => localStorage.getItem(key) });
+const directPreview = query.get('walk') === '1';
+const nativeStorage = createNativeSaveStorage(() => localStorage);
+const progressStorage = directPreview ? { getItem: nativeStorage.getItem } : nativeStorage;
+const readProgress = () => createRunProgress(progressStorage);
 
 function showTitle() {
   continueButton.disabled = !readProgress().hasSave;
@@ -56,20 +60,26 @@ function presentGame(current: Game) {
   const controls = 'WASD or arrows to move · Space to jump';
   let prompt = controls;
   let notice: number | undefined;
+  let sceneActive = false;
+  let subtitle: string | null = null;
   status.hidden = false;
   status.textContent = controls;
   pauseButton.hidden = false;
   canvas.focus();
+  function refreshStatus() {
+    status.textContent = sceneActive ? subtitle ?? 'Enter or Escape to skip' : prompt;
+  }
   function showNotice(text: string, duration: number) {
+    if (sceneActive) return;
     window.clearTimeout(notice);
     status.textContent = text;
-    notice = window.setTimeout(() => { notice = undefined; status.textContent = prompt; }, duration);
+    notice = window.setTimeout(() => { notice = undefined; refreshStatus(); }, duration);
   }
   const unsubscribe = current.onInteraction(event => {
     switch (event.type) {
       case 'prompt':
         prompt = event.target?.prompt ?? controls;
-        if (notice === undefined) status.textContent = prompt;
+        if (notice === undefined) refreshStatus();
         break;
       case 'shrine-rested': showNotice('The lantern is lit.', 3800); break;
       case 'scroll-captured': showNotice(event.lines.join('\n'), 6000); break;
@@ -79,11 +89,22 @@ function presentGame(current: Game) {
   });
   const unpause = current.context.registry.on('game.paused', paused => {
     pauseMenu.hidden = !paused;
-    pauseButton.hidden = paused;
+    pauseButton.hidden = paused || sceneActive;
     if (paused) resumeButton.focus();
     else canvas.focus();
   });
-  stopInterface = () => { unsubscribe(); unpause(); window.clearTimeout(notice); };
+  const activeScene = current.context.registry.on('story.scene', scene => {
+    sceneActive = Boolean(scene);
+    window.clearTimeout(notice);
+    notice = undefined;
+    pauseButton.hidden = sceneActive || current.context.paused;
+    refreshStatus();
+  });
+  const sceneSubtitle = current.context.registry.on('story.subtitle', line => {
+    subtitle = typeof line === 'string' ? line : null;
+    refreshStatus();
+  });
+  stopInterface = () => { unsubscribe(); unpause(); activeScene(); sceneSubtitle(); window.clearTimeout(notice); };
 }
 
 function closeSession() {
@@ -103,6 +124,7 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
   title.hidden = true;
   status.hidden = false;
   status.textContent = 'Loading chapter…';
+  let newRun: ReturnType<typeof createRunProgress> | undefined;
   try {
     const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
     if (kind === 'geometry') {
@@ -111,7 +133,10 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
     } else {
       const previous = readProgress();
       const fresh = createDefaultRun(previous.current.options);
-      const progress = kind === 'continue' ? previous : createRunProgress({ getItem: () => JSON.stringify(fresh) });
+      const progress = kind === 'continue' ? previous : createRunProgress({
+        ...progressStorage, getItem: key => key === saveKey ? JSON.stringify(fresh) : null,
+      });
+      if (kind === 'new' && !directPreview) newRun = progress;
       game = await createTraversalPreview({ ...options, progress,
         input: { keyboardTarget: canvas, pointerTarget: canvas, blurTarget: window, getGamepads: () => navigator.getGamepads() },
         audio: { createContext: () => new AudioContext(), gestureTarget: window, visibilityTarget: document },
@@ -120,6 +145,7 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
     }
     if (page.signal.aborted) { await closeSession(); return; }
     runtime.render();
+    newRun?.save();
     status.hidden = true;
     if (game) { presentGame(game); game.start(); }
   } catch (error) {
@@ -142,7 +168,9 @@ page.signal.addEventListener('abort', () => {
   observer.disconnect();
   void closeSession().catch(error => console.error(error));
 }, { once: true });
-startButton.addEventListener('click', () => { void launch('new'); }, listen);
+startButton.addEventListener('click', () => {
+  if (directPreview || !readProgress().hasSave || window.confirm('Begin a new native run?')) void launch('new');
+}, listen);
 continueButton.addEventListener('click', () => { void launch('continue'); }, listen);
 pauseButton.addEventListener('click', () => game?.setPaused(true), listen);
 resumeButton.addEventListener('click', () => game?.setPaused(false), listen);
@@ -153,6 +181,6 @@ returnButton.addEventListener('click', () => {
   void closeSession().then(() => { if (!page.signal.aborted) showTitle(); }, displayError);
 }, listen);
 
-if (query.get('walk') === '1') void launch(query.get('continue') === '1' ? 'continue' : 'new');
+if (directPreview) void launch(query.get('continue') === '1' ? 'continue' : 'new');
 else if (query.has('chapter') || query.get('geometry') === '1') void launch('geometry');
 else showTitle();

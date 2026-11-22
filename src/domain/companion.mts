@@ -9,7 +9,7 @@ interface CompanionPlayer extends Readonly<CollisionPosition> {
   readonly onCarrier: boolean;
 }
 
-type Phase = 'STRAY' | 'CARRIED' | 'FOLLOW' | 'IDLE' | 'SIT' | 'WAIT_GAP';
+type Phase = 'STRAY' | 'CARRIED' | 'FOLLOW' | 'IDLE' | 'SIT' | 'WAIT_GAP' | 'REUNITED';
 type CompanionEvent = { type: 'found' } | { type: 'gap' };
 
 const FOLLOW_GAP = 1.6;
@@ -94,7 +94,19 @@ export function createCompanion(world: CollisionWorld, found: boolean, emit?: (e
 
   return {
     state: state as Readonly<typeof state>,
+    completeIntroduction(player: CompanionPlayer) {
+      if (!state.found) { state.found = true; emit?.({ type: 'found' }); }
+      Object.assign(state, { x: player.x, y: player.y, z: player.z, heading: player.heading, speed: 0 });
+      vx = vz = 0;
+      phase('CARRIED');
+    },
+    reunite(pose: Readonly<CollisionPosition & { heading: number }>) {
+      Object.assign(state, pose, { speed: 0 });
+      vx = vz = 0;
+      phase('REUNITED');
+    },
     reset(player: CompanionPlayer) {
+      if (state.phase === 'REUNITED') return;
       trail.clear();
       vx = vz = state.speed = 0;
       if (state.found) {
@@ -104,7 +116,7 @@ export function createCompanion(world: CollisionWorld, found: boolean, emit?: (e
     },
     update(delta: number, player: CompanionPlayer, carryPressed: boolean) {
       if (!Number.isFinite(delta) || delta < 0) throw RangeError('Companion step must be finite and nonnegative');
-      if (delta === 0) return;
+      if (delta === 0 || state.phase === 'REUNITED') return;
       phaseTime += delta;
       if (carryPressed) toggleCarry(player);
       if (state.phase === 'STRAY') { turn(player.x, player.z, delta, 2.5); return; }

@@ -12,6 +12,7 @@ import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
 import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
 import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
 import { installDracoWorker } from './draco-worker.mjs';
+import { installFixtureTextures } from './windows-textures.mjs';
 
 const gpu = create(process.argv.slice(2));
 let pendingFrame;
@@ -26,6 +27,8 @@ Object.assign(globalThis, globals, {
   },
 });
 Object.defineProperty(navigator, 'gpu', { value: gpu, configurable: true });
+const restoreDraco = installDracoWorker();
+const fixtureTextures = installFixtureTextures();
 
 // Dawn supplies a real device and queue. This harness substitutes an offscreen
 // texture for the browser canvas's presentation texture.
@@ -347,30 +350,10 @@ try {
 
 const assetURL = new URL('../../sumiro/assets/', import.meta.url);
 
-// Dawn runs in Node, which lacks the browser image decoders used by GLTFLoader.
-// Keep the original rig geometry, skin and animation and omit its texture binding in memory.
-function rigWithoutImage(bytes) {
-  const jsonEnd = 20 + bytes.readUInt32LE(12);
-  const gltf = JSON.parse(bytes.toString('utf8', 20, jsonEnd));
-  assert.match(gltf.images[0].mimeType, /^image\/(jpeg|png)$/);
-  delete gltf.materials[0].pbrMetallicRoughness.baseColorTexture;
-  const json = Buffer.from(JSON.stringify(gltf));
-  const paddedLength = Math.ceil(json.length / 4) * 4;
-  const headerAndJson = Buffer.alloc(20 + paddedLength, 0x20);
-  bytes.copy(headerAndJson, 0, 0, 20);
-  headerAndJson.writeUInt32LE(headerAndJson.length + bytes.length - jsonEnd, 8);
-  headerAndJson.writeUInt32LE(paddedLength, 12);
-  json.copy(headerAndJson, 20);
-  return Buffer.concat([headerAndJson, bytes.subarray(jsonEnd)]);
-}
-
 const chapterAssets = {
   assetBaseURL: assetURL,
   async fetch(path) {
-    const url = new URL(path);
-    const bytes = await readFile(url);
-    const rig = /\/(player\/player|cat\/cat)\.glb$/.test(url.pathname);
-    return new Response(rig ? rigWithoutImage(bytes) : bytes);
+    return new Response(await readFile(new URL(path)));
   },
 };
 const chapter = await createChapterPreview({
@@ -411,9 +394,13 @@ try {
   const spawn = registry.get('player.position');
   const avatar = traversal.context.scene.getObjectByName('player');
   assert.ok(avatar, 'the supplied player rig must join the scene');
+  const environment = traversal.context.scene.getObjectByName('ch1_climb');
+  assert.ok(environment?.getObjectByName('plateau_top')?.isMesh, 'the playable chapter uses the authored plateau');
+  assert.ok(environment?.getObjectByName('bridge_planks')?.isMesh, 'the playable chapter uses the authored bridge');
   let skin;
   avatar.traverse(object => { if (object.isSkinnedMesh) skin = object; });
   assert.ok(skin?.skeleton.bones.length > 0, 'the supplied model must include a live skin');
+  if (fixtureTextures.realImages) assert.ok(skin.material.map?.image.width > 1, 'the Windows fixture must decode the supplied player texture');
   const initialBones = skin.skeleton.bones.map(bone => bone.quaternion.clone());
   const initialRailFrame = registry.get('camera.railFrame');
   const initialCamera = traversal.context.camera.position.clone();
@@ -423,7 +410,6 @@ try {
   traversal.render();
   const startingPixel = await sample(48, 58);
   const skyPixel = await sample(48, 8);
-  assert.ok(Math.abs(startingPixel[0] - skyPixel[0]) > 10, 'the rendered path is distinct from the sky');
   const probePixels = [38, 44, 48, 52, 58].flatMap(x => [30, 39, 48, 56].map(y => [x, y]));
   const withAvatar = await Promise.all(probePixels.map(([x, y]) => sample(x, y)));
   avatar.visible = false;
@@ -433,6 +419,14 @@ try {
   const visibleAvatar = withAvatar.some((pixel, index) => pixel.slice(0, 3)
     .some((channel, component) => Math.abs(channel - terrainOnly[index][component]) > 10));
   assert.equal(visibleAvatar, true, 'the actual skinned geometry must contribute pixels to the frame');
+  environment.visible = false;
+  pendingFrame(performance.now());
+  traversal.render();
+  const backgroundOnly = await Promise.all(probePixels.map(([x, y]) => sample(x, y)));
+  assert.ok(terrainOnly.some((pixel, index) => pixel.slice(0, 3)
+    .some((channel, component) => Math.abs(channel - backgroundOnly[index][component]) > 8)),
+  'authored environment models must contribute pixels even where pale rock and paper have similar colors');
+  environment.visible = true;
   avatar.visible = true;
   keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
   for (let frame = 0; frame < 60; frame++) traversal.step();
@@ -489,7 +483,6 @@ try {
 
 const checkpoints = [];
 let rejectCourt = true;
-let restoreDraco;
 const resumedRun = createRunProgress({
   getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau', flags: { inkStep: true }, abilities: { inkStep: true } }),
   setItem(key, value) { checkpoints.push([key, JSON.parse(value)]); },
@@ -531,12 +524,42 @@ try {
   assert.equal(error, null, error?.message);
   console.log('Chapter checkpoint WebGPU resume', JSON.stringify(position));
 
+  const sceneRegistry = resumed.context.registry;
+  for (let step = 0; step < 180 && sceneRegistry.get('story.scene') !== 'opening_cat'; step++) resumed.step();
+  assert.equal(sceneRegistry.get('story.scene'), 'opening_cat', JSON.stringify(sceneRegistry.get('player.position')));
+  const beforeScene = sceneRegistry.get('player.position');
+  const storyInput = keyboardDriver(resumed);
+  storyInput.tap('KeyW', 15);
+  const sceneFeet = sceneRegistry.get('player.position');
+  assert.deepEqual([sceneFeet.x, sceneFeet.y, sceneFeet.z], [beforeScene.x, beforeScene.y, beforeScene.z],
+    'manual input must not drive the player while the opening cue holds them still');
+  const seenSubtitles = [];
+  const clearSubtitleListener = sceneRegistry.on('story.subtitle', text => { if (text) seenSubtitles.push(text); });
+  for (let step = 0; step < 2400 && sceneRegistry.get('story.scene'); step++) {
+    resumed.step();
+    if (step % 240 !== 0) continue;
+    pendingFrame(performance.now());
+    device.pushErrorScope('validation');
+    resumed.render();
+    assert.equal(await device.popErrorScope(), null);
+  }
+  clearSubtitleListener();
+  assert.equal(sceneRegistry.get('story.scene'), null, 'the full opening must release camera and controls');
+  assert.equal(seenSubtitles.length, 2);
+  assert.equal(resumedRun.current.flags.cat_found, true);
+  assert.equal(sceneRegistry.get('companion.state').phase, 'CARRIED');
+  const beforeFailedSwitch = checkpoints.length;
+  console.log('Native Chapter One cat scene', JSON.stringify({
+    subtitles: seenSubtitles, storedFlag: checkpoints.at(-1)[1].flags.cat_found,
+    position: sceneRegistry.get('player.position'),
+  }));
+
   const previousRoot = resumed.context.scene.getObjectByName('ch1_climb');
   assert.ok(previousRoot?.parent);
   await assert.rejects(resumed.advanceChapter(), /HTTP 503/);
   assert.equal(resumed.context.scene.getObjectByName('ch1_climb'), previousRoot);
   assert.equal(resumedRun.current.chapter, 'ch1_climb');
-  assert.equal(checkpoints.length, 1);
+  assert.equal(checkpoints.length, beforeFailedSwitch);
   rejectCourt = false;
   assert.equal(await resumed.advanceChapter(), true);
   assert.equal(resumedRun.current.chapter, 'ch2_pass');
@@ -638,7 +661,6 @@ try {
   assert.ok(Math.abs(pineBridge.rotation.z - initialRoll) > 0.01);
   console.log('Native pines WebGPU readback', JSON.stringify({ pines, pinesPixel }));
 
-  restoreDraco = installDracoWorker();
   const laterChapters = [
     ['ch4_temple', 30, 8, -43],
     ['ch5_sea', 30, 3.6, -64],
@@ -689,7 +711,7 @@ try {
     console.log('Native chapter WebGPU readback', JSON.stringify({ id, feet, meshes, center: visible[2] }));
   }
 } finally {
-  try { await resumed.dispose(); } finally { restoreDraco?.(); }
+  await resumed.dispose();
 }
 
 let seaWrite;
@@ -765,4 +787,51 @@ try {
 } finally {
   pinesInput.release();
   await pinesCombat.dispose();
+}
+
+let summitWrite;
+const summitProgress = createRunProgress({
+  getItem: () => JSON.stringify({ ...createDefaultRun(), chapter: 'ch6_summit', shrine: 'arena_door',
+    flags: { ch6_duel: true, cat_found: true } }),
+  setItem(_key, value) { summitWrite = JSON.parse(value); },
+});
+const summit = await createTraversalPreview({
+  canvas,
+  viewport: { width: 96, height: 72, pixelRatio: 1 },
+  assets: chapterAssets,
+  progress: summitProgress,
+  input: { keyboardTarget },
+  gpu: nativeGpu,
+});
+const summitInput = keyboardDriver(summit);
+try {
+  const { registry } = summit.context;
+  const feet = () => registry.get('player.position');
+  const scene = () => registry.get('story.scene');
+  for (const mark of [{ x: -219, z: -350 }, { x: -286, z: -350 }]) {
+    for (let step = 0; step < 1200 && !scene(); step++) {
+      if (summitInput.steer(mark, feet(), .7) <= .7) break;
+      summit.step();
+    }
+    summitInput.release();
+  }
+  assert.equal(scene(), 'reunion', JSON.stringify(feet()));
+  assert.ok(summit.context.scene.getObjectByName('family0').visible);
+  for (let step = 0; step < 45; step++) summit.step();
+  device.pushErrorScope('validation');
+  summit.render();
+  assert.equal(await device.popErrorScope(), null);
+  summitInput.tap('Enter');
+  assert.equal(scene(), null);
+  assert.ok(feet().grounded && feet().x < -288, JSON.stringify(feet()));
+  for (let step = 0; step < 680 && !summitProgress.current.flags.finished; step++) {
+    summit.step();
+    if (step % 60 === 0) await Promise.resolve();
+  }
+  assert.equal(registry.get('companion.state').phase, 'REUNITED');
+  assert.equal(summitWrite?.flags.finished, true, 'skipping the reunion should still reach the authored ending');
+  console.log('Native Summit reunion and ending', JSON.stringify({ feet: feet(), finished: summitWrite.flags.finished }));
+} finally {
+  summitInput.release();
+  try { await summit.dispose(); } finally { fixtureTextures.restore(); restoreDraco(); }
 }

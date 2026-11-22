@@ -213,3 +213,32 @@ test('superseding or disposing a chapter settles promptly and prevents a stale d
   assert.equal(context.sources.length, 1);
   assert.equal(context.sources[0].disconnected, 1);
 });
+
+test('story dialogue uses the supplied recording and releases a cancelled scene voice', async testContext => {
+  const path = 'audio/voice/ch1_find_cat.ogg';
+  const bytes = await readFile(asset(path));
+  const requests = [];
+  assert.equal(bytes.toString('ascii', 0, 4), 'OggS');
+  const { mixer, context, cues } = mixerFixture(testContext, {
+    async loadArrayBuffer(request, { signal }) {
+      requests.push({ request, signal });
+      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    },
+  });
+  await mixer.unlock();
+  const scene = new AbortController();
+  const voice = cues.playRecording(path, 'voice', scene.signal, -2);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests[0].request, path);
+  assert.equal(voice.duration(), 200);
+  assert.equal(context.decoded[0].byteLength, bytes.byteLength);
+  const source = context.sources[0];
+  const [gain] = chain(source, mixer.buses.voice);
+  assert.equal(gain.gain.value, decibels(-2));
+  assert.deepEqual(source.starts, [[]]);
+  scene.abort();
+  assert.equal(requests[0].signal.aborted, true);
+  assert.deepEqual(source.stops, [[]]);
+  assert.equal(source.disconnected, 1);
+  assert.equal(gain.disconnected, 1);
+});

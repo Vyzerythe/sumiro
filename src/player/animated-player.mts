@@ -16,9 +16,10 @@ const GAIT_CLIPS = ['stand_idle', 'walk', 'jog', 'run', 'sprint'] as const;
 const ACTION_CLIPS = ['jump_up', 'jump_fwd', 'fall', 'land', 'land_heavy'] as const;
 const GESTURE_CLIPS = ['jump_windup', 'leap_generic', 'wall_leap', 'hang_idle', 'climb_up', 'mantle_low', 'dodge', 'ink_step'] as const;
 const COMBAT_CLIPS = ['idle_sword', 'run_sword', 'draw', 'attack_1', 'attack_2', 'attack_3', 'parry', 'parry_riposte', 'hit', 'death', 'rise', 'drink'] as const;
+const STORY_CLIPS = ['crouch_touch', 'interact'] as const;
 type GaitClip = (typeof GAIT_CLIPS)[number];
 type ActionClip = (typeof ACTION_CLIPS)[number] | (typeof GESTURE_CLIPS)[number];
-type PlayerClip = GaitClip | ActionClip | (typeof COMBAT_CLIPS)[number];
+type PlayerClip = GaitClip | ActionClip | (typeof COMBAT_CLIPS)[number] | (typeof STORY_CLIPS)[number];
 
 interface Layer {
   clip: PlayerClip | 'gait';
@@ -33,7 +34,7 @@ export interface AnimatedPlayer {
   readonly root: Group;
   readonly mixer: AnimationMixer;
   duration(name: string): number;
-  update(state: AnimatedPlayerState, delta: number, action?: { clip: string; frame: number }): void;
+  update(state: AnimatedPlayerState, delta: number, action?: { clip: string; frame: number; fade?: number }): void;
   reset(state?: AnimatedPlayerState): void;
   dispose(): void;
 }
@@ -67,7 +68,7 @@ export function createAnimatedPlayer(model: GLTF, { ownsMeshResources = true } =
     root.rotation.order = 'YXZ';
     root.traverse(object => { if (object instanceof Mesh) object.frustumCulled = false; });
     playerMixer = new AnimationMixer(root);
-    for (const name of [...GAIT_CLIPS, ...ACTION_CLIPS, ...GESTURE_CLIPS, ...COMBAT_CLIPS]) {
+    for (const name of [...GAIT_CLIPS, ...ACTION_CLIPS, ...GESTURE_CLIPS, ...COMBAT_CLIPS, ...STORY_CLIPS]) {
       const clip = clips.get(name);
       if (!clip) continue;
       const action = playerMixer.clipAction(clip).play();
@@ -184,13 +185,13 @@ export function createAnimatedPlayer(model: GLTF, { ownsMeshResources = true } =
     mixer.update(0);
   }
 
-  function update(state: AnimatedPlayerState, delta: number, action?: { clip: string; frame: number }, snap = false) {
+  function update(state: AnimatedPlayerState, delta: number, action?: { clip: string; frame: number; fade?: number }, snap = false) {
     if (disposed) return;
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Animation step must be nonnegative and finite');
     const speed = Math.hypot(state.vx, state.vz);
     const explicitClip = action?.clip as PlayerClip | undefined;
     if (action && explicitClip && actions.has(explicitClip) && Number.isFinite(action.frame)) {
-      play(explicitClip, snap ? 0 : 0.12);
+      play(explicitClip, snap ? 0 : action.fade ?? 0.12);
       const layer = layers.at(-1);
       if (layer) layer.time = Math.max(0, action.frame / 24) - delta * layer.speed;
     } else chooseAnimation(state, speed, snap);
