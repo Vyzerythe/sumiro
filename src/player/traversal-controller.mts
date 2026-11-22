@@ -238,7 +238,16 @@ export function createTraversalController(
       state.heading = heading;
       return state;
     },
-    reset() { Object.assign(state, initial); inkCooldown = 0; burst = null; },
+    reset(destination?: Readonly<{ x: number; z: number; heading: number }>) {
+      Object.assign(state, initial);
+      inkCooldown = 0;
+      burst = null;
+      const support = destination && world.groundAt(destination.x, destination.z);
+      if (destination && support) {
+        Object.assign(state, destination, { y: support.y, rootY: support.y, lastGroundY: support.y, fromY: support.y,
+          surface: support.surface, carrier: support.body, yaw: destination.heading });
+      }
+    },
     step(delta: number, input: TraversalInput, view: View) {
       if (!Number.isFinite(delta) || delta < 0) throw RangeError('Traversal step must be nonnegative and finite');
       if (delta === 0) return state.grounded;

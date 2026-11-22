@@ -52,7 +52,7 @@ The source runtime in `src/runtime/source-runtime.mts` composes the system host,
 
 To serve the native preview, run `npm run build:source` and serve the repository root. Open `http://localhost:8000/.local-build-source/` in a WebGPU-capable browser to inspect the Chapter One GLB. Use `?chapter=<chapter-id>` to inspect later geometry or `?walk=1` to start traversal with WASD, arrow keys, and Space. Chapter One includes its authored camera rail, gap leaps, shrine and scroll interactions, and ink-pool sequence. Chapter Two includes authored ledges and leaps, the court sword-wraith encounter, bells, door, moving slab, and crumble stones. All six chapters have native static collision and source-managed scene loading. Later encounters and portions of chapter progression still use the transitional build.
 
-The traversal preview uses the supplied player model and its traversal clips. Use `?walk=1&continue=1` to read a Chapter One checkpoint from the same browser origin. The preview can resume the table and plateau shrines and leaves stored saves untouched. The native test injects a writable store to verify explicit shrine interaction saves.
+The traversal preview uses the supplied player model and its traversal clips. Use `?walk=1&continue=1` to read an existing checkpoint from the same browser origin. The preview resolves the authored shrine stand and leaves stored browser saves untouched. The native tests inject a writable store to verify explicit shrine interaction saves in Chapters One and Five.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 

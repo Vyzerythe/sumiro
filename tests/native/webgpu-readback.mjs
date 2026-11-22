@@ -637,3 +637,33 @@ try {
 } finally {
   try { await resumed.dispose(); } finally { restoreDraco?.(); }
 }
+
+let seaWrite;
+const seaProgress = createRunProgress({
+  getItem: () => JSON.stringify({ ...createDefaultRun(), chapter: 'ch5_sea', shrine: 'first_rock' }),
+  setItem(_key, value) { seaWrite = JSON.parse(value); },
+});
+const seaResume = await createTraversalPreview({
+  canvas,
+  viewport: { width: 96, height: 72, pixelRatio: 1 },
+  assets: chapterAssets,
+  progress: seaProgress,
+  input: { keyboardTarget },
+  gpu: nativeGpu,
+});
+try {
+  const feet = seaResume.context.registry.get('player.position');
+  assert.deepEqual([feet.x, feet.z, feet.grounded], [27.4, -130.1, true]);
+  assert.equal(seaWrite, undefined);
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyE', repeat: false }));
+  seaResume.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyE' }));
+  assert.equal(seaWrite.chapter, 'ch5_sea');
+  assert.equal(seaWrite.shrine, 'first_rock');
+  device.pushErrorScope('validation');
+  seaResume.render();
+  assert.equal(await device.popErrorScope(), null);
+  console.log('Native Sea shrine resume', JSON.stringify(feet));
+} finally {
+  await seaResume.dispose();
+}
