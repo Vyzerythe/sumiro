@@ -10,10 +10,10 @@ interface FrameSource {
 interface LiveLoopOptions extends FrameSchedulerOptions {
   isPaused(): boolean;
   canSubmitFrame(): boolean;
-  beforeStep(): void;
+  beforeStep?(): void;
   step(): void;
   render(alpha: number): void;
-  afterRender(timestampMs: number): void;
+  afterRender?(timestampMs: number): void;
 }
 
 const browserFrames: FrameSource = {
@@ -43,7 +43,7 @@ export function startLiveLoop(options: LiveLoopOptions, frames: FrameSource = br
         paused: options.isPaused(),
       });
       for (let index = 0; index < frame.steps && !stopped; index++) {
-        options.beforeStep();
+        options.beforeStep?.();
         if (!stopped) options.step();
       }
       if (stopped) return;
@@ -54,7 +54,7 @@ export function startLiveLoop(options: LiveLoopOptions, frames: FrameSource = br
       if (paused && pausedRendered) return;
       pausedRendered = paused;
       options.render(paused ? 1 : frame.alpha);
-      if (!stopped) options.afterRender(timestampMs);
+      if (!stopped) options.afterRender?.(timestampMs);
     } catch (error) {
       stop();
       throw error;

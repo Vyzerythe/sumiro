@@ -27,6 +27,7 @@ The `assets/` hierarchy groups media by purpose (for example `audio/`, `backdrop
 | `sumiro/` | Published reference and deployed entry point |
 | `.local-build/` | Transitional gameplay build. Pinned adapters load readable domain, collision, player and frame-sizing code into the published runtime. |
 | `src/rendering/` | Native Three.js r187 device lifecycle, TSL surface buffers and final grade. The opt-in Dawn harness renders through these modules and reads back GPU pixels. |
+| `src/runtime/source-runtime.mts` | Composes native rendering, system hosting, assets, timing, and teardown. The Dawn harness drives this API using a fixture system. |
 
 The target is a source-only TypeScript application that uses the native WebGPU renderer for gameplay. Application boot, complete scene composition, materials, remaining render effects, and end-to-end gameplay verification are still in progress.
 

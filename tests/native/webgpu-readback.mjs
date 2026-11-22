@@ -5,7 +5,7 @@ import { mix, uniform, vec3, vec4 } from 'three/tsl';
 import { createInkGrade } from '../../src/rendering/ink-grade.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
 import { configureInkSurfacePass, createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
-import { createWebGpuSurface } from '../../src/rendering/webgpu-renderer.mts';
+import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
 
 const gpu = create(process.argv.slice(2));
 let pendingFrame;
@@ -68,9 +68,8 @@ const strength = uniform(1);
 const inspectNormalWeight = uniform(0);
 const inspectDepth = uniform(0);
 const inspectKey = uniform(0);
-material.colorNode = vec3(0.25, 0.5, 1.5).mul(strength);
 material.mrtNode = createInkSurfaceOutput({ lineWeight: 0.25 });
-scene.add(new Mesh(geometry, material));
+const background = new Mesh(geometry, material);
 const foregroundGeometry = new PlaneGeometry(0.12, 0.24);
 const foregroundMaterial = new MeshBasicNodeMaterial();
 foregroundMaterial.mrtNode = createInkSurfaceOutput({ lineWeight: 1, movingSurfaceId: 3 });
@@ -99,57 +98,94 @@ async function sample(x, y) {
   }
 }
 
-let surface;
+let runtime;
 let depthKey;
+let systemCleanups = 0;
+let renderCallbacks = 0;
+let updateCallbacks = 0;
 try {
-  surface = await createWebGpuSurface({
-    canvas, scene, camera,
-    buildOutput(scenePass) {
-      const { color, depth, normalWeight, surfaceData } = configureInkSurfacePass(scenePass);
-      depthKey = createInkDepthKey({ depth, surfaceData }, camera, { radiusPixels: 8, referenceHeight: 60 });
-      depthKey.resize(32, 32);
-      const normalPreview = vec4(normalWeight.r, normalWeight.b, normalWeight.a, 1);
-      const depthPreview = vec4(vec3(depth.r), 1);
-      const keyPreview = vec4(depthKey.texture.r.div(4), depthKey.texture.g.div(4), 0, 1);
-      return mix(mix(mix(createInkGrade(color), normalPreview, inspectNormalWeight), depthPreview, inspectDepth),
-        keyPreview, inspectKey);
-    },
-  }, {
-    requestAdapter: async () => ({
-      async requestDevice(descriptor) {
-        device = await adapter.requestDevice(descriptor);
-        return device;
+  runtime = await createSourceRuntime({
+    graphics: {
+      canvas, scene, camera,
+      buildOutput(scenePass) {
+        const { color, depth, normalWeight, surfaceData } = configureInkSurfacePass(scenePass);
+        depthKey = createInkDepthKey({ depth, surfaceData }, camera, { radiusPixels: 8, referenceHeight: 60 });
+        depthKey.resize(32, 32);
+        const normalPreview = vec4(normalWeight.r, normalWeight.b, normalWeight.a, 1);
+        const depthPreview = vec4(vec3(depth.r), 1);
+        const keyPreview = vec4(depthKey.texture.r.div(4), depthKey.texture.g.div(4), 0, 1);
+        return mix(mix(mix(createInkGrade(color), normalPreview, inspectNormalWeight), depthPreview, inspectDepth),
+          keyPreview, inspectKey);
       },
-    }),
+    },
+    systems: {
+      './fixture.mts': async () => ({
+        whilePaused: true,
+        async init(context, lifetime) {
+          const rgb = await context.assets.loadJSON('data:application/json,%5B0.25%2C0.5%2C1.5%5D');
+          material.colorNode = vec3(...rgb).mul(strength);
+          lifetime.ownRoot(background);
+          lifetime.defer(() => systemCleanups++);
+        },
+        update(delta, context) {
+          updateCallbacks++;
+          context.registry.set('fixture.step', [context.time.step, delta]);
+        },
+        beforeRender() { renderCallbacks++; },
+      }),
+    },
+    viewport: { width: 32, height: 32, pixelRatio: 1 },
+    assets: { assetBaseURL: 'https://reference.invalid/' },
+    gpu: {
+      requestAdapter: async () => ({
+        async requestDevice(descriptor) {
+          device = await adapter.requestDevice(descriptor);
+          return device;
+        },
+      }),
+    },
   });
-  assert.equal(surface.backend, 'webgpu');
+  assert.equal(runtime.backend, 'webgpu');
+  assert.equal(runtime.context.assets.pending, 0);
+  assert.equal(runtime.report()[0].failed, null);
+  assert.ok(scene.children.includes(background));
+  runtime.step();
+  assert.deepEqual(runtime.context.registry.get('fixture.step'), [1, 1 / 60]);
+  assert.equal(runtime.context.clock.elapsedTime, 1 / 60);
+  runtime.context.paused = true;
+  runtime.step();
+  assert.equal(runtime.context.time.step, 1);
+  assert.equal(updateCallbacks, 2);
+  runtime.context.paused = false;
   device.pushErrorScope('validation');
-  surface.render();
+  runtime.render();
   const first = { center: await sample(16, 16), corner: await sample(1, 1) };
-  surface.resize(64, 48, 1.25);
-  surface.setResolutionScale(0.75);
+  runtime.resize(64, 48, 1.25);
+  runtime.setResolutionScale(0.75);
   depthKey.resize(60, 45);
   strength.value = 0.25;
   assert.equal(typeof pendingFrame, 'function', 'Three.js must schedule a new render frame');
   pendingFrame(performance.now());
-  surface.render();
+  runtime.render();
   const resized = { center: await sample(40, 30), corner: await sample(1, 1) };
   inspectNormalWeight.value = 1;
   pendingFrame(performance.now());
-  surface.render();
+  runtime.render();
   const normalWeight = await sample(40, 30);
   inspectDepth.value = 1;
   pendingFrame(performance.now());
-  surface.render();
+  runtime.render();
   const depth = await sample(40, 30);
   scene.add(foreground);
   inspectKey.value = 1;
   pendingFrame(performance.now());
-  surface.render();
+  runtime.render();
   const key = await sample(40, 30);
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
   assert.deepEqual([canvas.width, canvas.height], [80, 60]);
+  assert.deepEqual([runtime.context.view.drawWidth, runtime.context.view.drawHeight], [80, 60]);
+  assert.equal(renderCallbacks, 5);
 
   // Independent CPU evaluation of the shoulder and corner curves, then sRGB.
   // A two-code-value band accommodates the bounded per-pixel dither and f16 sampling.
@@ -181,11 +217,14 @@ try {
   material.dispose();
   foregroundGeometry.dispose();
   foregroundMaterial.dispose();
-  if (surface) {
-    const disposing = surface.dispose();
-    assert.equal(surface.dispose(), disposing);
+  if (runtime) {
+    const disposing = runtime.dispose();
+    assert.equal(runtime.dispose(), disposing);
     await disposing;
+    assert.equal(systemCleanups, 1);
+    assert.equal(scene.children.includes(background), false);
+    await assert.rejects(runtime.context.assets.loadJSON('data:application/json,null'), { name: 'AbortError' });
     assert.ok(unconfigured > 0);
-    assert.throws(() => surface.render(), /disposed/);
+    assert.throws(() => runtime.render(), /disposed/);
   }
 }
