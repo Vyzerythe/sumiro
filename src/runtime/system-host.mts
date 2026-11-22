@@ -109,6 +109,8 @@ export function createSystemHost<Root, Context extends { scene: SystemScene<Root
   let updates: Entry<Root, Context>[] = [];
   let pausedUpdates: Entry<Root, Context>[] = [];
   let renders: Entry<Root, Context>[] = [];
+  let disposal: Promise<void> | undefined;
+  const cleanupTasks = new Set<Promise<void>>();
 
   function refresh() {
     const active = entries.filter(entry => entry.enabled && entry.initialized && !entry.closed);
@@ -123,7 +125,10 @@ export function createSystemHost<Root, Context extends { scene: SystemScene<Root
 
   function runCleanup(name: string, cleanup: Cleanup) {
     try {
-      void Promise.resolve(cleanup()).catch(error => reportCleanupError(name, error));
+      const task = Promise.resolve(cleanup()).catch(error => reportCleanupError(name, error));
+      cleanupTasks.add(task);
+      const forget = () => { cleanupTasks.delete(task); };
+      void task.then(forget, forget);
     } catch (error) {
       reportCleanupError(name, error);
     }
@@ -292,10 +297,14 @@ export function createSystemHost<Root, Context extends { scene: SystemScene<Root
       if (changed) refresh();
     },
     dispose() {
-      if (isDisposed()) return;
+      if (disposal) return disposal;
       phase = 'disposed';
+      disposal = Promise.resolve().then(async () => {
+        while (cleanupTasks.size > 0) await Promise.allSettled([...cleanupTasks]);
+      });
       for (const entry of [...entries].reverse()) release(entry);
       refresh();
+      return disposal;
     },
     report() {
       return entries.map(entry => {

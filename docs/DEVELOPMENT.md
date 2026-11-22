@@ -48,7 +48,7 @@ Documentation or validation changes can be made here directly by pull request. A
 
 ## Native WebGPU verification
 
-The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and final TSL composition. Callers own the scene, camera, and additional passes. The default suite checks the generated WGSL for the grade and geometric ink contours, as well as startup rollback and pass disposal.
+The source runtime in `src/runtime/source-runtime.mts` composes the system host, asset service, simulation clock, and WebGPU renderer. The renderer owns the device, canvas configuration, scene pass, and final TSL composition. Callers own the scene, camera, and additional passes. Runtime teardown awaits system cleanup before freeing the asset service and renderer. The default suite checks the generated WGSL for the grade and geometric ink contours, as well as startup rollback and pass disposal.
 
 For device execution, install the separate Dawn test dependency and run the offscreen check:
 

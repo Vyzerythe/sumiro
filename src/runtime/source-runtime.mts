@@ -74,7 +74,7 @@ export async function createSourceRuntime({
 
   async function release() {
     try {
-      host?.dispose();
+      await host?.dispose();
     } finally {
       try {
         input.dispose();

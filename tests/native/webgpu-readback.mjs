@@ -139,7 +139,11 @@ try {
           const rgb = await context.assets.loadJSON('data:application/json,%5B0.25%2C0.5%2C1.5%5D');
           material.colorNode = vec3(...rgb).mul(strength);
           lifetime.ownRoot(background);
-          lifetime.defer(() => systemCleanups++);
+          lifetime.defer(async () => {
+            assert.equal(await context.assets.loadJSON('data:application/json,true'), true);
+            assert.equal(unconfigured, 0, 'the GPU surface must survive asynchronous system cleanup');
+            systemCleanups++;
+          });
         },
         update(delta, context) {
           updateCallbacks++;

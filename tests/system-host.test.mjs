@@ -157,3 +157,32 @@ test('a timed-out system aborts and rolls back before later initialization', asy
   assert.deepEqual(events, ['abort', 'cleanup', 'later init']);
   assert.equal(host.report()[0].failed, 'init');
 });
+
+test('host disposal starts cleanup once and waits for it to settle', async () => {
+  const host = createHost(new Scene());
+  let finishCleanup;
+  const gate = new Promise(resolve => { finishCleanup = resolve; });
+  const events = [];
+  await host.load({
+    './systems/worker.js': async () => ({
+      init(_context, lifetime) {
+        lifetime.defer(async () => {
+          events.push('cleanup began');
+          await gate;
+          events.push('cleanup finished');
+        });
+      },
+    }),
+  });
+  const closing = host.dispose();
+  assert.equal(host.dispose(), closing);
+  let closed = false;
+  void closing.then(() => { closed = true; });
+  await Promise.resolve();
+  assert.equal(closed, false);
+  assert.deepEqual(events, ['cleanup began']);
+  finishCleanup();
+  await closing;
+  assert.equal(closed, true);
+  assert.deepEqual(events, ['cleanup began', 'cleanup finished']);
+});
