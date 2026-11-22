@@ -67,18 +67,23 @@ const REST_STANCES = new Set(['IDLE', 'WALK', 'RUN', 'SPRINT', 'LAND', 'TEETER']
 export function createCheckpointInteraction(id: string, world: Pick<CollisionWorld, 'groundAt'>, progress: RunProgress) {
   const sites = getChapterCheckpoints(id).map(shrine => ({ ...shrine, y: world.groundAt(shrine.x, shrine.z)?.y ?? -Infinity }));
   let rested: Checkpoint | undefined;
+  function nearest(feet: PlayerState) {
+    if (rested && Math.hypot(feet.x - rested.x, feet.z - rested.z) >= 2.5) rested = undefined;
+    if (!feet.grounded || !REST_STANCES.has(feet.state)) return null;
+    let best: Checkpoint | null = null;
+    let distanceToBest = 1.9;
+    for (const site of sites) {
+      if (rested === site || Math.abs(feet.y - site.y) > 1.6) continue;
+      const distance = Math.hypot(feet.x - site.x, feet.z - site.z);
+      if (distance < distanceToBest) { best = site; distanceToBest = distance; }
+    }
+    return best;
+  }
   return {
+    nearest,
     update(feet: PlayerState, pressed: boolean, fighting: boolean): string | null {
-      if (rested && Math.hypot(feet.x - rested.x, feet.z - rested.z) >= 2.5) rested = undefined;
-      if (!feet.grounded || !REST_STANCES.has(feet.state) || !pressed || fighting) return null;
-      let best: Checkpoint | undefined;
-      let nearest = 1.9;
-      for (const site of sites) {
-        if (rested === site || Math.abs(feet.y - site.y) > 1.6) continue;
-        const distance = Math.hypot(feet.x - site.x, feet.z - site.z);
-        if (distance < nearest) { best = site; nearest = distance; }
-      }
-      if (!best) return null;
+      const best = nearest(feet);
+      if (!pressed || fighting || !best) return null;
       progress.checkpoint(best.id);
       rested = best;
       return best.id;

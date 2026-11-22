@@ -1,6 +1,6 @@
 /** Story interaction rules from the shipped Chapter One, game, kit, and layout bundles. */
 import type { createRunProgress } from '../domain/run-progress.mts';
-import { scrollCount, scrollTexts } from '../domain/scrolls.mts';
+import { scrollCount, scrollTexts, type ScrollId } from '../domain/scrolls.mts';
 import { pointInPolygon, type PointXZ } from '../physics/geometry.mts';
 
 export const chapterOneInteractionSites = {
@@ -45,7 +45,7 @@ export type ChapterOneInteractionEvent =
   | { type: 'entry'; litShrine: Shrine | null; scrollCaptured: boolean; inkLearned: boolean }
   | { type: 'prompt'; target: ChapterOneTarget | null }
   | { type: 'shrine-rested'; id: Shrine }
-  | { type: 'scroll-captured'; id: Scroll; lines: readonly string[]; count: number; total: number }
+  | { type: 'scroll-captured'; id: ScrollId; lines: readonly string[]; count: number; total: number }
   | { type: 'pool-contact' }
   | { type: 'gate'; phase: GatePhase }
   | { type: 'camera-lead'; target: typeof CAMERA_LEAD | null }

@@ -3,7 +3,7 @@ import type { createTraversalController } from '../player/traversal-controller.m
 
 type PlayerState = ReturnType<typeof createTraversalController>['state'];
 
-/** Native view for chapters without recovered camera zones. */
+/** Former fallback, superseded by the authored later-chapter camera zones. */
 export function createStaticTraversalCamera(world: CollisionWorld, zone: string) {
   let aimX = 0, aimY = 0, aimZ = 0;
   let previousTeleport = -1;

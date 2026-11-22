@@ -242,3 +242,23 @@ test('story dialogue uses the supplied recording and releases a cancelled scene 
   assert.equal(source.disconnected, 1);
   assert.equal(gain.disconnected, 1);
 });
+
+test('the ending replaces chapter music with the authored non-looping credits track', async testContext => {
+  const requests = [];
+  const { mixer, context, cues } = mixerFixture(testContext, {
+    async loadJSON() { return manifest; },
+    async loadArrayBuffer(path) {
+      requests.push(path);
+      const bytes = await readFile(asset(path));
+      assert.equal(bytes.toString('ascii', 0, 4), 'OggS');
+      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    },
+  });
+  await mixer.unlock();
+  assert.equal(await cues.play('chapter', 'ch6_summit'), true);
+  assert.equal(await cues.play('credits'), true);
+  assert.deepEqual(requests, ['audio/music/ch6.ogg', 'audio/music/credits.ogg']);
+  assert.equal(context.sources[0].disconnected, 1);
+  assert.equal(context.sources[1].loop, false);
+  assert.equal(chain(context.sources[1], mixer.buses.music).length, 1);
+});

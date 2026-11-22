@@ -2,6 +2,8 @@ import { createRunProgress } from '../domain/run-progress.mts';
 import { createNativeSaveStorage } from '../domain/native-save-storage.mts';
 import { createDefaultRun, saveKey } from '../domain/save.mts';
 import { createChapterPreview } from './chapter-preview.mts';
+import { createCredits } from './credits.mts';
+import { createCreditsView } from './credits-view.mts';
 import { createTraversalPreview } from './traversal-preview.mts';
 
 function element<Kind extends Element>(selector: string): Kind {
@@ -19,6 +21,7 @@ const pauseButton = element<HTMLButtonElement>('#pause-button');
 const pauseMenu = element<HTMLElement>('#pause-menu');
 const resumeButton = element<HTMLButtonElement>('#resume');
 const returnButton = element<HTMLButtonElement>('#return-to-title');
+const advanceCredits = element<HTMLButtonElement>('#advance-credits');
 
 function viewport(element: HTMLCanvasElement) {
   return {
@@ -43,6 +46,7 @@ const directPreview = query.get('walk') === '1';
 const nativeStorage = createNativeSaveStorage(() => localStorage);
 const progressStorage = directPreview ? { getItem: nativeStorage.getItem } : nativeStorage;
 const readProgress = () => createRunProgress(progressStorage);
+const credits = createCreditsView(element<HTMLElement>('#credits'), advanceCredits, returnToTitle);
 
 function showTitle() {
   continueButton.disabled = !readProgress().hasSave;
@@ -56,7 +60,7 @@ function displayError(error: unknown) {
   status.textContent = error instanceof Error ? error.message : 'The native session could not start.';
 }
 
-function presentGame(current: Game) {
+function presentGame(current: Game, progress: ReturnType<typeof createRunProgress>) {
   const controls = 'WASD or arrows to move · Space to jump';
   let prompt = controls;
   let notice: number | undefined;
@@ -104,7 +108,21 @@ function presentGame(current: Game) {
     subtitle = typeof line === 'string' ? line : null;
     refreshStatus();
   });
-  stopInterface = () => { unsubscribe(); unpause(); activeScene(); sceneSubtitle(); window.clearTimeout(notice); };
+  const laterPrompt = current.context.registry.on('chapter.prompt', value => {
+    if (current.context.registry.get('chapter.current') === 'ch1_climb') return;
+    prompt = value ?? controls;
+    if (notice === undefined) refreshStatus();
+  });
+  const completed = current.context.registry.on('game.completed', finished => {
+    if (!finished) return;
+    pauseButton.hidden = pauseMenu.hidden = status.hidden = true;
+    credits.show(createCredits(progress.current));
+  });
+  stopInterface = () => {
+    unsubscribe(); unpause(); activeScene(); sceneSubtitle(); laterPrompt(); completed();
+    window.clearTimeout(notice);
+    credits.reset();
+  };
 }
 
 function closeSession() {
@@ -118,6 +136,10 @@ function closeSession() {
   return closing;
 }
 
+function returnToTitle() {
+  void closeSession().then(() => { if (!page.signal.aborted) showTitle(); }, displayError);
+}
+
 async function launch(kind: 'new' | 'continue' | 'geometry') {
   if (starting || closing || runtime || page.signal.aborted) return;
   starting = true;
@@ -125,6 +147,7 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
   status.hidden = false;
   status.textContent = 'Loading chapter…';
   let newRun: ReturnType<typeof createRunProgress> | undefined;
+  let run: ReturnType<typeof createRunProgress> | undefined;
   try {
     const options = { canvas, viewport: viewport(canvas), assets: { assetBaseURL } };
     if (kind === 'geometry') {
@@ -136,6 +159,7 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
       const progress = kind === 'continue' ? previous : createRunProgress({
         ...progressStorage, getItem: key => key === saveKey ? JSON.stringify(fresh) : null,
       });
+      run = progress;
       if (kind === 'new' && !directPreview) newRun = progress;
       game = await createTraversalPreview({ ...options, progress,
         input: { keyboardTarget: canvas, pointerTarget: canvas, blurTarget: window, getGamepads: () => navigator.getGamepads() },
@@ -147,7 +171,7 @@ async function launch(kind: 'new' | 'continue' | 'geometry') {
     runtime.render();
     newRun?.save();
     status.hidden = true;
-    if (game) { presentGame(game); game.start(); }
+    if (game && run) { presentGame(game, run); game.start(); }
   } catch (error) {
     await closeSession().catch(cleanupError => console.error(cleanupError));
     if (!page.signal.aborted) { showTitle(); displayError(error); }
@@ -177,9 +201,8 @@ resumeButton.addEventListener('click', () => game?.setPaused(false), listen);
 window.addEventListener('keydown', event => {
   if (event.code === 'Escape' && game?.context.paused && event.target !== canvas && !event.repeat) game.setPaused(false);
 }, listen);
-returnButton.addEventListener('click', () => {
-  void closeSession().then(() => { if (!page.signal.aborted) showTitle(); }, displayError);
-}, listen);
+returnButton.addEventListener('click', returnToTitle, listen);
+advanceCredits.addEventListener('click', credits.advance, listen);
 
 if (directPreview) void launch(query.get('continue') === '1' ? 'continue' : 'new');
 else if (query.has('chapter') || query.get('geometry') === '1') void launch('geometry');

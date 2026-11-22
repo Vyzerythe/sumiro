@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { create, globals } from 'webgpu';
-import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
-import { mix, uniform, vec3, vec4 } from 'three/tsl';
+import { Group, Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
+import { mix, texture3D, uniform, vec3, vec4 } from 'three/tsl';
 import { createChapterPreview } from '../../src/application/chapter-preview.mts';
 import { createTraversalPreview } from '../../src/application/traversal-preview.mts';
 import { createRunProgress } from '../../src/domain/run-progress.mts';
 import { createDefaultRun } from '../../src/domain/save.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
 import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
+import { createInkNoiseTexture } from '../../src/rendering/ink-paper-wash.mts';
 import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
+import { blendSeaReflection, createSeaReflectionPass } from '../../src/rendering/sea-reflection.mts';
 import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
 import { installDracoWorker } from './draco-worker.mjs';
 import { installFixtureTextures } from './windows-textures.mjs';
@@ -117,13 +119,16 @@ function keyboardDriver(runtime) {
       for (let step = 0; step < steps; step++) runtime.step();
       dispatch('keyup', code);
     },
-    steer(target, position, stopRadius) {
+    steer(target, position, stopRadius, yawDegrees = runtime.context.registry.get('camera.steeringYaw') ?? 0) {
       const dx = target.x - position.x, dz = target.z - position.z;
       const distance = Math.hypot(dx, dz);
       const desired = new Set();
       if (distance > stopRadius) {
-        if (Math.abs(dx) > Math.abs(dz) * 0.4) desired.add(dx > 0 ? 'KeyD' : 'KeyA');
-        if (Math.abs(dz) > Math.abs(dx) * 0.4) desired.add(dz < 0 ? 'KeyW' : 'KeyS');
+        const yaw = yawDegrees * Math.PI / 180;
+        const strafe = Math.cos(yaw) * dx - Math.sin(yaw) * dz;
+        const forward = -Math.sin(yaw) * dx - Math.cos(yaw) * dz;
+        if (Math.abs(strafe) > Math.abs(forward) * 0.4) desired.add(strafe > 0 ? 'KeyD' : 'KeyA');
+        if (Math.abs(forward) > Math.abs(strafe) * 0.4) desired.add(forward > 0 ? 'KeyW' : 'KeyS');
       }
       hold(desired);
       return distance;
@@ -350,6 +355,55 @@ try {
 
 const assetURL = new URL('../../sumiro/assets/', import.meta.url);
 
+async function verifySeaReflection() {
+  const camera = new OrthographicCamera(-1, 1, 1, -1, .1, 10);
+  camera.position.z = 3;
+  const scene = new Scene();
+  const geometry = new PlaneGeometry(.32, .26);
+  const material = new MeshBasicNodeMaterial();
+  const occluder = new Mesh(geometry, material);
+  occluder.position.set(.38, -.42, 1.5);
+  occluder.visible = false;
+  scene.add(occluder);
+  const source = new Group();
+  const silhouette = new Mesh(geometry, material);
+  silhouette.name = 'reflection_probe';
+  silhouette.position.set(.38, .42, 1);
+  source.add(silhouette);
+  const noise = createInkNoiseTexture();
+  let reflection;
+  let stop;
+  try {
+    stop = await createSourceRuntime({
+      graphics: { canvas, scene, camera, buildOutput(pass) {
+        const depth = pass.getTextureNode('depth');
+        reflection = createSeaReflectionPass(camera, { depth, noise: texture3D(noise) });
+        reflection.bind(source, [silhouette.name]);
+        reflection.update(0, 0);
+        return { outputNode: blendSeaReflection(vec4(.015, .015, .015, 1), reflection.texture), ...reflection };
+      } },
+      assets: { assetBaseURL: assetURL }, systems: {}, gpu: nativeGpu,
+      viewport: { width: 96, height: 72, pixelRatio: 1 },
+    });
+    device.pushErrorScope('validation');
+    stop.render();
+    const above = await sample(66, 21);
+    const mirrored = await sample(66, 51);
+    assert.ok(mirrored[0] > above[0] + 15, `a mirrored fragment must lighten the water: ${mirrored} vs ${above}`);
+    occluder.visible = true;
+    pendingFrame(performance.now());
+    stop.render();
+    const blocked = await sample(66, 51);
+    assert.deepEqual(blocked, above, 'opaque land in front must reject the reflected fragment');
+    const error = await device.popErrorScope();
+    assert.equal(error, null, error?.message);
+    console.log('Sea reflection WebGPU visibility', JSON.stringify({ above, mirrored, blocked }));
+  } finally {
+    try { await stop?.dispose(); } finally { geometry.dispose(); material.dispose(); noise.dispose(); }
+  }
+}
+await verifySeaReflection();
+
 const chapterAssets = {
   assetBaseURL: assetURL,
   async fetch(path) {
@@ -484,7 +538,7 @@ try {
 const checkpoints = [];
 let rejectCourt = true;
 const resumedRun = createRunProgress({
-  getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau', flags: { inkStep: true }, abilities: { inkStep: true } }),
+  getItem: () => JSON.stringify({ ...createDefaultRun(), shrine: 'plateau' }),
   setItem(key, value) { checkpoints.push([key, JSON.parse(value)]); },
 });
 const resumed = await createTraversalPreview({
@@ -514,10 +568,7 @@ try {
   assert.equal(checkpoints.length, 1);
   assert.equal(checkpoints[0][0], 'sumiro.save.v1');
   assert.equal(checkpoints[0][1].shrine, 'plateau');
-  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'ShiftLeft', repeat: false }));
-  resumed.step();
-  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'ShiftLeft' }));
-  assert.equal(resumed.context.registry.get('player.position').state, 'DODGE');
+  assert.equal(resumed.context.scene.getObjectByName('shrine_plateau').getObjectByName('lantern_glow').visible, true);
   device.pushErrorScope('validation');
   resumed.render();
   const error = await device.popErrorScope();
@@ -548,6 +599,25 @@ try {
   assert.equal(seenSubtitles.length, 2);
   assert.equal(resumedRun.current.flags.cat_found, true);
   assert.equal(sceneRegistry.get('companion.state').phase, 'CARRIED');
+  const poolAndGate = [];
+  const listenPool = resumed.onInteraction(event => {
+    if (event.type === 'pool-contact' || event.type === 'gate') poolAndGate.push(event);
+  });
+  const inkPool = { x: 5.87, z: -59.16 };
+  for (let step = 0; step < 240; step++) {
+    if (storyInput.steer(inkPool, sceneRegistry.get('player.position'), 1.05) <= 1.05) break;
+    resumed.step();
+  }
+  storyInput.release();
+  storyInput.tap('KeyE');
+  for (let step = 0; step < 420; step++) resumed.step();
+  listenPool();
+  assert.equal(resumedRun.current.abilities.inkStep, true, JSON.stringify(sceneRegistry.get('player.position')));
+  assert.equal(checkpoints.at(-1)[1].flags.inkStep, true);
+  assert.deepEqual(poolAndGate.map(event => event.phase ?? event.type), ['pool-contact', 'dropping', 'open']);
+  storyInput.tap('ShiftLeft');
+  assert.equal(sceneRegistry.get('player.position').state, 'DODGE');
+  for (let step = 0; step < 40; step++) resumed.step();
   const beforeFailedSwitch = checkpoints.length;
   console.log('Native Chapter One cat scene', JSON.stringify({
     subtitles: seenSubtitles, storedFlag: checkpoints.at(-1)[1].flags.cat_found,
@@ -561,7 +631,22 @@ try {
   assert.equal(resumedRun.current.chapter, 'ch1_climb');
   assert.equal(checkpoints.length, beforeFailedSwitch);
   rejectCourt = false;
-  assert.equal(await resumed.advanceChapter(), true);
+  const gateEvents = [];
+  const listenGate = resumed.onInteraction(event => { if (event.type === 'chapter-exit') gateEvents.push(event); });
+  const gateInput = keyboardDriver(resumed);
+  for (const mark of [{ x: 12.6, z: -59.6 }, { x: 15.6, z: -62.65 }]) {
+    for (let step = 0; step < 600 && gateEvents.length === 0; step++) {
+      if (gateInput.steer(mark, sceneRegistry.get('player.position'), .32, sceneRegistry.get('camera.steeringYaw')) <= .32) break;
+      resumed.step();
+    }
+    gateInput.release();
+  }
+  listenGate();
+  assert.equal(gateEvents.length, 1, JSON.stringify(sceneRegistry.get('player.position')));
+  await resumed.context.assets.whenIdle();
+  for (let frame = 0; frame < 120 && resumedRun.current.chapter === 'ch1_climb'; frame++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
   assert.equal(resumedRun.current.chapter, 'ch2_pass');
   assert.equal(checkpoints.at(-1)[1].chapter, 'ch2_pass');
   assert.equal(previousRoot.parent, null);
@@ -761,8 +846,12 @@ const pinesCombat = await createTraversalPreview({
 const pinesInput = keyboardDriver(pinesCombat);
 try {
   const { registry } = pinesCombat.context;
-  pinesInput.tap('KeyA', 65);
   const encounter = () => registry.get('combat.encounters');
+  for (let step = 0; step < 180 && encounter()?.actors.length === 0; step++) {
+    pinesInput.steer({ x: -16.2, z: -197.6 }, registry.get('player.position'), .35);
+    pinesCombat.step();
+  }
+  pinesInput.release();
   assert.equal(encounter().actors.filter(actor => actor.alive).length, 2, JSON.stringify(registry.get('player.position')));
   device.pushErrorScope('validation');
   pinesCombat.render();
@@ -830,6 +919,9 @@ try {
   }
   assert.equal(registry.get('companion.state').phase, 'REUNITED');
   assert.equal(summitWrite?.flags.finished, true, 'skipping the reunion should still reach the authored ending');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(registry.get('game.completed'), true);
+  assert.equal(summit.context.paused, true, 'completion must stop traversal while the credits are open');
   console.log('Native Summit reunion and ending', JSON.stringify({ feet: feet(), finished: summitWrite.flags.finished }));
 } finally {
   summitInput.release();

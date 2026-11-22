@@ -17,6 +17,17 @@
     button:focus-visible { outline: 2px solid #decda7; outline-offset: 3px; }
     button:disabled { opacity: .5; }
     #pause-button { position: fixed; inset: 1rem 1rem auto auto; }
+    #credits { position: fixed; inset: 0; overflow: hidden; text-align: center; background: #11100e; color: #e7dcc1; font: italic clamp(1rem, 2.7vh, 1.65rem)/1.55 Georgia, serif; }
+    #credits h2 { margin: 2.5rem 0 .5rem; font: normal .85em Georgia, serif; letter-spacing: .13em; text-transform: uppercase; }
+    #credits p { margin: .35rem 0; }
+    #credits button { position: absolute; bottom: 1.25rem; right: 1.25rem; }
+    .credit-roll { position: absolute; inset: 100% 0 auto; max-width: 54rem; margin: auto; padding: 1.25rem; }
+    .credit-roll.stationary { inset: 0 0 5rem; overflow: auto; }
+    .credit-roll span, .credit-roll small { opacity: .7; margin: 0 .75em; }
+    .credit-roll strong { font-weight: normal; }
+    .credit-end { position: absolute; inset: 0; display: grid; place-content: center; padding: 1rem; }
+    .credit-end[hidden] { display: none; }
+    #credits .credit-end h2 { margin: 0 0 1rem; font: normal clamp(2.5rem, 9vw, 5rem) Georgia, serif; text-transform: none; }
   </style>
   <script type="importmap">
     {"imports": {
@@ -42,5 +53,13 @@
     <button type="button" id="return-to-title">Quit to title</button>
   </section>
   <p role="status" hidden></p>
+  <section id="credits" aria-label="Credits" hidden>
+    <div class="credit-roll" hidden></div>
+    <div class="credit-end" hidden>
+      <h2>Sumiro</h2>
+      <p>The road goes on past this page.<br>The rest of it is still wet.</p>
+    </div>
+    <button type="button" id="advance-credits">Skip credits</button>
+  </section>
 </body>
 </html>

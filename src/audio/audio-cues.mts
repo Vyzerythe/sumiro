@@ -3,7 +3,7 @@ import type { AssetManager } from '../assets/asset-manager.mts';
 import type { AudioMixer } from './audio-mixer.mts';
 
 type EffectCue = 'shrine' | 'scroll' | 'gate';
-export type AudioCue = 'chapter' | EffectCue | 'story';
+export type AudioCue = 'chapter' | 'credits' | EffectCue | 'story';
 
 export interface AudioCuesOptions {
   mixer: Pick<AudioMixer, 'context' | 'buses'>;
@@ -310,10 +310,10 @@ export function createAudioCues({ mixer, assets, seed = 1, reportError }: AudioC
   }
 
   return {
-    async play(cue: 'chapter' | EffectCue, chapterId = 'ch1_climb'): Promise<boolean> {
+    async play(cue: 'chapter' | 'credits' | EffectCue, chapterId = 'ch1_climb'): Promise<boolean> {
       if (lifetime.signal.aborted) return false;
-      if (cue === 'chapter') {
-        const id = /^ch[1-6](?=_|$)/.exec(chapterId)?.[0];
+      if (cue === 'chapter' || cue === 'credits') {
+        const id = cue === 'credits' ? cue : /^ch[1-6](?=_|$)/.exec(chapterId)?.[0];
         if (!id) return false;
         if (pending?.id !== id) {
           pending?.controller.abort();

@@ -7,12 +7,13 @@ import { createInkNoiseTexture, type InkWashControls } from './ink-paper-wash.mt
 import { configureInkSurfacePass } from './ink-surface-pass.mts';
 import { createInkSurfaceSky, createInkWashSheet, type InkWashSheet } from './ink-surface-sky.mts';
 import { createSeaShoreline, type SeaShorelineInputs } from './sea-shoreline.mts';
+import { blendSeaReflection, createSeaReflectionPass } from './sea-reflection.mts';
 import type { WebGpuOutputGraph } from './webgpu-renderer.mts';
 
 type InkSettings = NonNullable<Parameters<typeof createInkComposite>[2]> & {
   paper?: { strength?: number };
   washSheets?: readonly (Omit<InkWashSheet, 'noise'> & { controls?: InkWashControls })[];
-  sea?: Omit<SeaShorelineInputs, 'depth' | 'noise'> & { enabled: Node<'bool'> };
+  sea?: Omit<SeaShorelineInputs, 'depth' | 'noise'> & { enabled: Node<'bool'>; reflection?: boolean };
   noiseSeed?: number;
 };
 
@@ -29,6 +30,7 @@ export function createInkRenderGraph(
   const edge = rtt(createInkEdgeAnalysis(attachments, camera, settings),
     null, null, textureOptions);
   let volume: ReturnType<typeof createInkNoiseTexture> | undefined;
+  let seaReflection: ReturnType<typeof createSeaReflectionPass> | undefined;
   try {
     let layer = createInkComposite({ ...attachments, edge }, camera, settings);
     if (settings.paper || settings.washSheets?.length || settings.sea) {
@@ -38,11 +40,14 @@ export function createInkRenderGraph(
       const sea = settings.sea;
       if (sea) {
         const base = layer;
-        const { enabled, ...water } = sea;
+        const { enabled, reflection, ...water } = sea;
+        seaReflection = reflection ? createSeaReflectionPass(camera, { depth: attachments.depth, noise }) : undefined;
+        const mirror = seaReflection;
         layer = Fn(() => {
           const result = base.toVar();
           If(enabled, () => {
             result.assign(createSeaShoreline(result, camera, { ...water, depth: attachments.depth, noise }));
+            if (mirror) result.assign(blendSeaReflection(result, mirror.texture));
           });
           return result;
         })();
@@ -56,25 +61,32 @@ export function createInkRenderGraph(
       const outputNode = createInkGrade(composite);
       let disposed = false;
       return {
-        attachments, edge, composite, outputNode,
+        attachments, edge, composite, outputNode, seaReflection,
         setResolutionScale(scale: number) {
           edge.setResolutionScale(scale);
           composite.setResolutionScale(scale);
+          seaReflection?.setResolutionScale(scale);
         },
         dispose() {
           if (disposed) return;
           disposed = true;
           try { composite.dispose(); } finally {
-            try { edge.dispose(); } finally { volume?.dispose(); }
+            try { edge.dispose(); } finally {
+              try { seaReflection?.dispose(); } finally { volume?.dispose(); }
+            }
           }
         },
-      } satisfies WebGpuOutputGraph & { attachments: typeof attachments; edge: typeof edge; composite: typeof composite };
+      } satisfies WebGpuOutputGraph & {
+        attachments: typeof attachments; edge: typeof edge; composite: typeof composite; seaReflection: typeof seaReflection;
+      };
     } catch (error) {
       composite.dispose();
       throw error;
     }
   } catch (error) {
-    try { edge.dispose(); } finally { volume?.dispose(); }
+    try { edge.dispose(); } finally {
+      try { seaReflection?.dispose(); } finally { volume?.dispose(); }
+    }
     throw error;
   }
 }
