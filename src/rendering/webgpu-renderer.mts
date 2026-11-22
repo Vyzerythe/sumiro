@@ -4,7 +4,13 @@ import {
 } from 'three/webgpu';
 import { pass } from 'three/tsl';
 
-type BuildOutput = (scenePass: PassNode) => Node;
+export interface WebGpuOutputGraph {
+  readonly outputNode: Node;
+  setResolutionScale(scale: number): void;
+  dispose(): void;
+}
+
+type BuildOutput = (scenePass: PassNode) => Node | WebGpuOutputGraph;
 
 interface WebGpuSurfaceOptions {
   canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -15,20 +21,20 @@ interface WebGpuSurfaceOptions {
   deviceDescriptor?: GPUDeviceDescriptor;
 }
 
-/**
- * Owns the scene pass and final pipeline. Callers retain ownership of the
- * scene, camera, and any additional resources allocated by their output graph.
- */
+/** Owns the scene pass, final pipeline, and any graph returned by buildOutput. */
 export function createWebGpuPipeline(
   renderer: WebGPURenderer, scene: Scene, camera: Camera,
   buildOutput: BuildOutput = scenePass => scenePass.getTextureNode(),
 ) {
   const scenePass = pass(scene, camera);
   let pipeline: RenderPipeline;
+  let graph: WebGpuOutputGraph | undefined;
   try {
-    pipeline = new RenderPipeline(renderer, buildOutput(scenePass));
+    const output = buildOutput(scenePass);
+    const outputNode = 'outputNode' in output ? (graph = output).outputNode : output;
+    pipeline = new RenderPipeline(renderer, outputNode);
   } catch (error) {
-    scenePass.dispose();
+    try { graph?.dispose(); } finally { scenePass.dispose(); }
     throw error;
   }
 
@@ -45,6 +51,7 @@ export function createWebGpuPipeline(
       assertActive();
       if (!Number.isFinite(scale) || scale <= 0) throw RangeError('Resolution scale must be positive and finite');
       scenePass.setResolutionScale(scale);
+      graph?.setResolutionScale(scale);
     },
     render() {
       assertActive();
@@ -56,7 +63,7 @@ export function createWebGpuPipeline(
       try {
         pipeline.dispose();
       } finally {
-        scenePass.dispose();
+        try { graph?.dispose(); } finally { scenePass.dispose(); }
       }
     },
   };

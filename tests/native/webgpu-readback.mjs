@@ -2,10 +2,9 @@ import assert from 'node:assert/strict';
 import { create, globals } from 'webgpu';
 import { Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, Scene } from 'three/webgpu';
 import { mix, uniform, vec3, vec4 } from 'three/tsl';
-import { createInkGrade } from '../../src/rendering/ink-grade.mts';
 import { createInkDepthKey } from '../../src/rendering/ink-depth-key.mts';
-import { createInkEdgeAnalysis } from '../../src/rendering/ink-edge.mts';
-import { configureInkSurfacePass, createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
+import { createInkRenderGraph } from '../../src/rendering/ink-render-graph.mts';
+import { createInkSurfaceOutput } from '../../src/rendering/ink-surface-pass.mts';
 import { createSourceRuntime } from '../../src/runtime/source-runtime.mts';
 
 const gpu = create(process.argv.slice(2));
@@ -70,6 +69,8 @@ const inspectNormalWeight = uniform(0);
 const inspectDepth = uniform(0);
 const inspectKey = uniform(0);
 const inspectEdge = uniform(0);
+const inspectComposite = uniform(0);
+const applyInk = uniform(0);
 material.mrtNode = createInkSurfaceOutput({ lineWeight: 0.25 });
 const background = new Mesh(geometry, material);
 const foregroundGeometry = new PlaneGeometry(0.12, 0.24);
@@ -111,6 +112,9 @@ async function sample(x, y) {
 
 let runtime;
 let depthKey;
+let inkGraph;
+let graphReleases = 0;
+let contextRequests = 0;
 let systemCleanups = 0;
 let renderCallbacks = 0;
 let updateCallbacks = 0;
@@ -119,17 +123,18 @@ try {
     graphics: {
       canvas, scene, camera,
       buildOutput(scenePass) {
-        const { color, depth, normalWeight, surfaceData } = configureInkSurfacePass(scenePass);
+        inkGraph = createInkRenderGraph(scenePass, camera, { referenceHeight: 60, fogStrength: 0 });
+        const { color, depth, normalWeight, surfaceData } = inkGraph.attachments;
         depthKey = createInkDepthKey({ depth, surfaceData }, camera, { radiusPixels: 8, referenceHeight: 60 });
         depthKey.resize(32, 32);
         const normalPreview = vec4(normalWeight.r, normalWeight.b, normalWeight.a, 1);
         const depthPreview = vec4(vec3(depth.r), 1);
         const keyPreview = vec4(depthKey.texture.r.div(4), depthKey.texture.g.div(4), 0, 1);
-        const edge = createInkEdgeAnalysis({ depth, normalWeight }, camera, { referenceHeight: 60 });
-        const edgePreview = vec4(vec3(edge.r), 1);
-        const inspection = mix(mix(mix(createInkGrade(color), normalPreview, inspectNormalWeight), depthPreview,
+        const edgePreview = vec4(vec3(inkGraph.edge.r), 1);
+        const inspection = mix(mix(mix(inkGraph.outputNode, normalPreview, inspectNormalWeight), depthPreview,
           inspectDepth), keyPreview, inspectKey);
-        return mix(inspection, edgePreview, inspectEdge);
+        return { ...inkGraph, outputNode: mix(mix(inspection, edgePreview, inspectEdge),
+          mix(color, inkGraph.composite, applyInk), inspectComposite) };
       },
     },
     systems: {
@@ -154,6 +159,7 @@ try {
     },
     viewport: { width: 32, height: 32, pixelRatio: 1 },
     assets: { assetBaseURL: 'https://reference.invalid/' },
+    audio: { createContext() { contextRequests++; throw Error('Audio must wait for unlock'); } },
     input: { keyboardTarget },
     gpu: {
       requestAdapter: async () => ({
@@ -166,6 +172,15 @@ try {
   });
   assert.equal(runtime.backend, 'webgpu');
   assert.equal(runtime.context.assets.pending, 0);
+  const { audio, registry } = runtime.context;
+  registry.set('game.options', { master: 1, music: 0.5, effects: 1 });
+  const musicGain = audio.getEffectiveGain('music');
+  const effectsGain = audio.getEffectiveGain('effects');
+  assert.ok(Math.abs(musicGain - 0.09 * 10 ** (-5 / 20)) < 1e-12);
+  registry.set('audio.duck', true);
+  assert.equal(audio.getEffectiveGain('music'), musicGain);
+  assert.ok(Math.abs(audio.getEffectiveGain('effects') - 0.1 * effectsGain) < 1e-12);
+  assert.equal(contextRequests, 0);
   assert.equal(runtime.report()[0].failed, null);
   assert.ok(scene.children.includes(background));
   assert.deepEqual(runtime.context.registry.get('fixture.step'), [0, 0, false]);
@@ -209,15 +224,31 @@ try {
   runtime.render();
   const flatEdge = await sample(10, 30);
   let contourPeak = 0;
+  let contourX = 43;
   for (let x = 43; x <= 53; x++) {
     const [level] = await sample(x, 30);
-    contourPeak = Math.max(contourPeak, level);
+    if (level > contourPeak) {
+      contourPeak = level;
+      contourX = x;
+    }
   }
+  inspectComposite.value = 1;
+  pendingFrame(performance.now());
+  runtime.render();
+  const baseColor = { flat: await sample(10, 30), contour: await sample(contourX, 30) };
+  applyInk.value = 1;
+  pendingFrame(performance.now());
+  runtime.render();
+  const inkColor = { flat: await sample(10, 30), contour: await sample(contourX, 30) };
   const error = await device.popErrorScope();
   assert.equal(error, null, error?.message);
   assert.deepEqual([canvas.width, canvas.height], [80, 60]);
   assert.deepEqual([runtime.context.view.drawWidth, runtime.context.view.drawHeight], [80, 60]);
-  assert.equal(renderCallbacks, 6);
+  for (const texture of [inkGraph.edge, inkGraph.composite]) {
+    assert.deepEqual([texture.renderTarget.width, texture.renderTarget.height], [60, 45]);
+    texture.renderTarget.addEventListener('dispose', () => graphReleases++);
+  }
+  assert.equal(renderCallbacks, 8);
 
   // Independent CPU evaluation of the shoulder and corner curves, then sRGB.
   // A two-code-value band accommodates the bounded per-pixel dither and f16 sampling.
@@ -244,8 +275,12 @@ try {
     'neighboring foreground depth and surface ID ' + key);
   assert.deepEqual(flatEdge, [0, 0, 0, 255], 'a flat, constant-depth surface should have zero contour');
   assert.ok(contourPeak >= 64, 'the near-to-far discontinuity should produce a visible contour');
+  assert.deepEqual(inkColor.flat, baseColor.flat, 'a flat surface must retain its scene color');
+  assert.ok(inkColor.contour.every((level, channel) => channel === 3
+    ? level === baseColor.contour[channel]
+    : level < baseColor.contour[channel] - 2), 'a contour must visibly darken the scene color');
   console.log('Native WebGPU readback', JSON.stringify({
-    first, resized, expected, normalWeight, depth, key, flatEdge, contourPeak, tolerance,
+    first, resized, expected, normalWeight, depth, key, flatEdge, contourPeak, baseColor, inkColor, tolerance,
   }));
 } finally {
   depthKey?.dispose();
@@ -258,6 +293,7 @@ try {
     assert.equal(runtime.dispose(), disposing);
     await disposing;
     assert.equal(systemCleanups, 1);
+    assert.equal(graphReleases, 2);
     assert.equal(scene.children.includes(background), false);
     assert.equal(pressSpace(), false);
     await assert.rejects(runtime.context.assets.loadJSON('data:application/json,null'), { name: 'AbortError' });

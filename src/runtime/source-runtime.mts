@@ -1,5 +1,6 @@
 import { PerspectiveCamera, type Camera, type Object3D, type Scene } from 'three/webgpu';
 import { createAssetManager, type AssetManager, type AssetManagerOptions } from '../assets/asset-manager.mts';
+import { createAudioMixer, type AudioMixer, type AudioMixerContext, type AudioMixerOptions, type AudioVolumes } from '../audio/audio-mixer.mts';
 import { createInputManager, type InputManager, type InputManagerOptions } from '../input/input-manager.mts';
 import { createWebGpuSurface } from '../rendering/webgpu-renderer.mts';
 import { FixedStepClock, SimulationTimeReader } from './fixed-step-clock.mts';
@@ -13,27 +14,34 @@ interface Viewport {
   pixelRatio: number;
 }
 
-export interface SourceRuntimeContext {
+interface RuntimeValues extends Record<string, unknown> {
+  'game.options': Partial<AudioVolumes>;
+  'audio.duck': boolean;
+}
+
+export interface SourceRuntimeContext<AudioContextType extends AudioMixerContext = AudioContext> {
   readonly scene: Scene;
   readonly camera: Camera;
   readonly assets: AssetManager;
+  readonly audio: AudioMixer<AudioContextType> | null;
   readonly input: InputManager;
-  readonly registry: RuntimeRegistry;
+  readonly registry: RuntimeRegistry<RuntimeValues>;
   readonly time: FixedStepClock;
   readonly clock: SimulationTimeReader;
   readonly view: Readonly<Viewport & { drawWidth: number; drawHeight: number; pxScale: number }>;
   paused: boolean;
 }
 
-type SourceSystem = RuntimeSystem<Object3D, SourceRuntimeContext>;
-type SourceSystemLoader = () => Promise<SourceSystem | { default: SourceSystem }>;
+type SourceSystem<Context> = RuntimeSystem<Object3D, Context>;
+type SourceSystemLoader<Context> = () => Promise<SourceSystem<Context> | { default: SourceSystem<Context> }>;
 type Surface = Awaited<ReturnType<typeof createWebGpuSurface>>;
 
-interface SourceRuntimeOptions {
+interface SourceRuntimeOptions<AudioContextType extends AudioMixerContext> {
   graphics: Parameters<typeof createWebGpuSurface>[0];
   assets: AssetManagerOptions;
+  audio?: AudioMixerOptions<AudioContextType>;
   input?: InputManagerOptions;
-  systems: Record<string, SourceSystemLoader>;
+  systems: Record<string, SourceSystemLoader<SourceRuntimeContext<AudioContextType>>>;
   viewport: Viewport;
   only?: readonly string[];
   simulationHz?: number;
@@ -46,23 +54,26 @@ interface SourceRuntimeOptions {
 }
 
 /** Owns subsystem lifetime, asset loading, and native rendering for one source session. */
-export async function createSourceRuntime({
-  graphics, assets: assetOptions, input: inputOptions, systems, viewport, only,
+export async function createSourceRuntime<AudioContextType extends AudioMixerContext = AudioContext>({
+  graphics, assets: assetOptions, audio: audioOptions, input: inputOptions, systems, viewport, only,
   simulationHz = 60, videoFps = 24, referenceHeight = 704, initializeTimeoutMs = 120_000,
   canSubmitFrame = () => true, gpu, frames,
-}: SourceRuntimeOptions) {
+}: SourceRuntimeOptions<AudioContextType>) {
   if (!Number.isFinite(referenceHeight) || referenceHeight <= 0) throw RangeError('Reference height must be positive');
   const time = new FixedStepClock(simulationHz, videoFps);
   const assets = createAssetManager(assetOptions);
   const input = createInputManager(inputOptions);
+  const audio = audioOptions ? createAudioMixer(audioOptions) : null;
+  const registry = new RuntimeRegistry<RuntimeValues>();
+  const detachAudio = audio ? [registry.on('game.options', audio.setVolumes), registry.on('audio.duck', audio.setDucked)] : [];
   const view = { ...viewport, drawWidth: 0, drawHeight: 0, pxScale: 1 };
-  const context: SourceRuntimeContext = {
-    scene: graphics.scene, camera: graphics.camera, assets, input,
-    registry: new RuntimeRegistry(), time, clock: new SimulationTimeReader(time),
+  const context: SourceRuntimeContext<AudioContextType> = {
+    scene: graphics.scene, camera: graphics.camera, assets, audio, input,
+    registry, time, clock: new SimulationTimeReader(time),
     view, paused: false,
   };
 
-  let host: ReturnType<typeof createSystemHost<Object3D, SourceRuntimeContext>> | undefined;
+  let host: ReturnType<typeof createSystemHost<Object3D, typeof context>> | undefined;
   let surface: Surface | undefined;
   let loop: ReturnType<typeof startLiveLoop> | undefined;
   let disposal: Promise<void> | undefined;
@@ -73,19 +84,18 @@ export async function createSourceRuntime({
   }
 
   async function release() {
-    try {
-      await host?.dispose();
-    } finally {
-      try {
-        input.dispose();
-      } finally {
-        try {
-          assets.dispose();
-        } finally {
-          await surface?.dispose();
-        }
-      }
+    const failures: unknown[] = [];
+    for (const cleanup of [
+      () => host?.dispose(),
+      () => { for (const detach of detachAudio) detach(); },
+      () => audio?.dispose(),
+      () => input.dispose(),
+      () => assets.dispose(),
+      () => surface?.dispose(),
+    ]) {
+      try { await cleanup(); } catch (error) { failures.push(error); }
     }
+    if (failures.length) throw new AggregateError(failures, 'Source runtime cleanup failed');
   }
 
   function dispose() {
@@ -115,7 +125,7 @@ export async function createSourceRuntime({
   }
 
   try {
-    host = createSystemHost<Object3D, SourceRuntimeContext>(context, {
+    host = createSystemHost<Object3D, typeof context>(context, {
       defaultBudgetMs: 1.5,
       initializeTimeoutMs,
     });
