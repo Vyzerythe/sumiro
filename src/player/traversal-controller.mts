@@ -56,7 +56,15 @@ export function createTraversalController(
     world, bodyCapsule, probeOffset: 0.35,
     collision: world.sweepCapsule(state, 0, 0, bodyCapsule),
     surfaceName: surface => surface,
-    hasSupport: (x, z) => Boolean(visit(x, z)),
+    hasSupport(x, z) {
+      if (visit(x, z)) return true;
+      if (!state.carrier?.enabled) return false;
+      for (let sample = 0; sample < 8; sample++) {
+        const angle = sample * Math.PI / 4;
+        if (visit(x + Math.cos(angle) * 0.15, z + Math.sin(angle) * 0.15)) return true;
+      }
+      return false;
+    },
     hasSafeDrop: (x, z, dx, dz) => around(x, z, dx, dz, 0.6, -tuning.stepDown, -tuning.safeDrop),
     hasHigherGround: (x, z, dx, dz) => around(x, z, dx, dz, 0.3, 4, tuning.stepUp),
     estimateNormal(x, z, fallbackX, fallbackZ, contact) {
@@ -199,6 +207,12 @@ export function createTraversalController(
     step(delta: number, input: TraversalInput, view: View) {
       if (!Number.isFinite(delta) || delta < 0) throw RangeError('Traversal step must be nonnegative and finite');
       if (delta === 0) return state.grounded;
+      if (state.grounded && state.carrier?.enabled) {
+        const before = state.y;
+        state.carrier.carry(state);
+        state.rootY += state.y - before;
+        state.heading = wrapAngle(state.heading + state.carrier.dyaw);
+      }
       state.stateT += delta;
       inkCooldown = Math.max(0, inkCooldown - delta);
       state.jumpBuf = Math.max(0, state.jumpBuf - delta);

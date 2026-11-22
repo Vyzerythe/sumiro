@@ -1,12 +1,12 @@
 import { Box3, Color, DirectionalLight, Group, HemisphereLight, PerspectiveCamera, Scene, Sphere } from 'three/webgpu';
 import type { Object3D } from 'three/webgpu';
-import { disposeGLTF } from '../assets/asset-manager.mts';
 import { firstChapterId } from '../domain/chapters.mts';
 import { createInkRenderGraph } from '../rendering/ink-render-graph.mts';
-import { bindInkMeshMaterials } from '../rendering/ink-mesh-materials.mts';
 import { createChapterManager } from '../runtime/chapter-manager.mts';
 import { createSourceRuntime } from '../runtime/source-runtime.mts';
+import { chapterThreeSceneAssets } from './chapter-three-world.mts';
 import { loadChapterTwoScene } from './chapter-two-scene.mts';
+import { loadInkSceneAsset } from './ink-scene-asset.mts';
 
 type RuntimeOptions = Parameters<typeof createSourceRuntime<AudioContext>>[0];
 
@@ -54,16 +54,12 @@ export async function createChapterPreview({ canvas, chapter = firstChapterId, .
                 const root = await loadChapterTwoScene(context.assets, resources);
                 return { root, data: new Box3().setFromObject(root).getBoundingSphere(new Sphere()) };
               }
-              if (id !== firstChapterId) throw Error(`Geometry preview is unavailable for ${id}`);
-              const model = await context.assets.loadGLTF('levels/ch1_climb/pieces.glb', {
-                displaySpace: false, signal: resources.signal,
-              });
-              resources.defer(() => disposeGLTF(model));
-              resources.signal.throwIfAborted();
-              resources.defer(bindInkMeshMaterials(model.scene));
-              const box = new Box3().setFromObject(model.scene);
+              const path = id === firstChapterId ? 'levels/ch1_climb/pieces.glb' : id === 'ch3_pines' ? chapterThreeSceneAssets.world : null;
+              if (!path) throw Error(`Geometry preview is unavailable for ${id}`);
+              const root = await loadInkSceneAsset(context.assets, path, resources);
+              const box = new Box3().setFromObject(root);
               if (box.isEmpty()) throw Error('Chapter geometry contains no bounded meshes');
-              return { root: model.scene, data: box.getBoundingSphere(new Sphere()) };
+              return { root, data: box.getBoundingSphere(new Sphere()) };
             },
           });
           lifetime.defer(() => chapters.dispose());

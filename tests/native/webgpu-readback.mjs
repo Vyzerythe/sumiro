@@ -515,6 +515,36 @@ try {
   const switchError = await device.popErrorScope();
   assert.equal(switchError, null, switchError?.message);
   console.log('Native chapter switch WebGPU readback', JSON.stringify({ arrival, chapterTwoPixel }));
+
+  function key(code, steps) {
+    keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: false }));
+    for (let step = 0; step < steps; step++) resumed.step();
+    keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code }));
+  }
+  key('KeyD', 43);
+  for (let step = 0; step < 16; step++) resumed.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
+  for (let step = 0; step < 235 && resumed.context.registry.get('player.position').z > -35.4; step++) resumed.step();
+  keyboardTarget.dispatchEvent(Object.assign(new Event('keyup'), { code: 'KeyW' }));
+  key('KeyJ', 1);
+  assert.equal(resumedRun.current.flags.ch2_court_door, true, 'an attack near the bell must open the court');
+  for (let step = 0; step < 55; step++) resumed.step();
+  const leaves = nextRoot.getObjectByName('court_door_leaves');
+  assert.deepEqual(leaves.children.map(node => node.rotation.y), [1.75, -1.75]);
+
+  assert.equal(await resumed.advanceChapter(), true);
+  assert.equal(nextRoot.parent, null);
+  assert.ok(resumed.context.scene.getObjectByName('ch3_pines')?.parent);
+  pendingFrame(performance.now());
+  device.pushErrorScope('validation');
+  resumed.render();
+  const pines = resumed.context.registry.get('player.position');
+  assert.deepEqual([pines.x, pines.y, pines.z, pines.grounded], [32, 20, -60, true]);
+  const pinesPixel = await sample(48, 58);
+  assert.equal(pinesPixel[3], 255);
+  const pinesError = await device.popErrorScope();
+  assert.equal(pinesError, null, pinesError?.message);
+  console.log('Native pines WebGPU readback', JSON.stringify({ pines, pinesPixel }));
 } finally {
   await resumed.dispose();
 }

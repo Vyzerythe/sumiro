@@ -61,6 +61,10 @@ export function createRunProgress(storage: RunStorage) {
       run.abilities.inkStep = true;
       return persist();
     },
+    setFlag(flag: string) {
+      Object.defineProperty(run.flags, flag, { value: true, enumerable: true, configurable: true, writable: true });
+      return persist();
+    },
     /** Commit progression after the incoming chapter has activated. */
     async completeChapter(activate: (id: string) => Promise<unknown>) {
       if (switching) throw Error('A chapter switch is in progress');
